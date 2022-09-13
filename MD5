@@ -1,0 +1,9 @@
+205964f6525f9e94e88f06e94e9d1d02 *DESCRIPTION
+9cab8a14b65a32020c77530e3a8c058b *LICENSE
+e53a5c420e64cd5c1dbb2414163988b4 *NAMESPACE
+f0b34f9d36d7c8e0bdc4f5b19860bbaf *R/dataset.R
+eea7b325722b9e78d8e568f8f60de78b *R/globals.R
+f76f008a6518f534789bb2afd73c706f *R/nlive.R
+952900ad6cd20578287aad6a055f53b1 *data/dataset.rda
+1a0aaaa8158f09c63c27c73e75231ab7 *man/dataset.Rd
+ae7efe73aa8d03ee4a3a84e26f9b751d *man/nlive.Rd

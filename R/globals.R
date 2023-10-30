@@ -23,4 +23,9 @@ utils::globalVariables(c("%>%",
                          "sqldf",
                          "time_pos",
                          "legend",
-                         "points"))
+                         "points",
+                         "round",
+                         'knitr',
+                         "nlraa",
+                         'write.table',
+                         'read.table'))

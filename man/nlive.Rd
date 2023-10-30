@@ -29,13 +29,13 @@ nlive(
 \arguments{
 \item{model}{indicator of the model to fit (1=Sigmoidal Mixed Model, 2=Piecewise Mixed Model with abrupt change, 3=Piecewise Mixed Model with smooth transition)}
 
-\item{dataset}{data frame containing the variables ID, outcome, time, predictor.all, and predictor.par1 to predictor.par4. This data frame needs to be named "dataset" (see example below).}
+\item{dataset}{data frame containing the variables ID, outcome, time, predictor.all, and predictor.par1 to predictor.par4.}
 
 \item{ID}{name of the variable representing the grouping structure specified with " (e.g., "ID" representing the unique identifier of participants).}
 
 \item{outcome}{name of the time-varying variable representing the longitudinal outcome specified with " (e.g., "outcome").}
 
-\item{time}{name of the variable representing the timescale specified with " (e.g., "time"). Can be negative or positive. Note that model 1, SMM, will always report a positive value under the midpoint parameter (e.g. if the time in the data goes from 0 down to -10 and the time of the midpoint is -2, the model will report a midpoint of 2).}
+\item{time}{name of the variable representing the timescale specified with " (e.g., "time"), which can be negative or positive.}
 
 \item{predictor.all}{optional vector indicating the name of the variable(s) that the four main parameters of the model of interest will be adjusted to (e.g. predictor.all=c("X1","X2")). Default to NULL.}
 
@@ -68,7 +68,7 @@ nlive(
 \value{
 An object of class SaemixObject (from the existing \emph{saemix} R package) containing the results of
 the fit of the data by the non-linear mixed \emph{model} of interest. The \emph{nlive} function automatically provides
-(i) a spaghetti plot of the observed outcome for 70 randomly selected statistical units in the \emph{dataset} and
+(i) a spaghetti plot of the observed outcome for 70 randomly selected statistical units in the dataset and
 (ii) the standard \emph{saemix} output, including the fixed effects estimates, the variance of random effects,
 and Likelihood of the fitted \emph{model}. The outputs are printed on the terminal and the numerical and
 graphical outputs are stored in a directory.
@@ -91,26 +91,33 @@ Thus, users must ensure that continuous variables are centered on the mean.
 }
 \examples{
 
-#### Fitting a piecewise mixed model with abrupt change - with no covariate
-\donttest{
-head(dataset)
-pmm.abrupt.fit = nlive(model=2, dataset=dataset, ID="ID", outcome="cognition", time="time")
+#### Fitting a sigmoidal mixed model - with no covariate
+\dontrun{
+head(dataCog)
+requireNamespace('nlraa')
+smm.fit = nlive(model=1, dataset=dataCog, ID="ID", outcome="cognition", time="time")
 }
-#### plot(pmm.abrupt.fit) to obtain the diagnostic plots to assess the
-#### goodness-of-fit of pmm.abrupt.fit
-#### psi(pmm.abrupt.fit): to obtain the estimates of individual parameters
+
+#### plot(smm.fit): diagnostic plots to assess the goodness-of-fit of smm.fit
+#### psi(smm.fit): estimates of individual parameters
+
+#### Fitting a piecewise mixed model with abrupt change - with no covariate
+\dontrun{
+pmm.abrupt.fit = nlive(model=2, dataset=dataCog, ID="ID", outcome="cognition", time="time")
+}
+#### plot(pmm.abrupt.fit): diagnostic plots to assess the goodness-of-fit of pmm.abrupt.fit
+#### psi(pmm.abrupt.fit): estimates of individual parameters
 
 
 #### Fitting a piecewise mixed model with smooth change - with all parameters
 #### adjusted for ageDeath90. Here, the nlive() function will also provide a
 #### plot of the estimated marginal trajectory in the whole study sample.
-\donttest{
-pmm.smooth.fit = nlive(model=3, dataset=dataset, ID="ID", outcome="cognition", time="time",
+\dontrun{
+pmm.smooth.fit = nlive(model=3, dataset=dataCog, ID="ID", outcome="cognition", time="time",
 predictor.all = c("ageDeath90"), traj.marg = TRUE)
 }
-#### plot(pmm.smooth.fit): to obtain the diagnostic plots to assess the
-#### goodness-of-fit of the model
-#### psi(pmm.smooth.fit): to obtain the estimates of individual parameters
+#### plot(pmm.smooth.fit): diagnostic plots to assess the goodness-of-fit of the model
+#### psi(pmm.smooth.fit): estimates of individual parameters
 
 
 }

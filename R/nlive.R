@@ -18,10 +18,10 @@
 #'
 #'
 #' @param model indicator of the model to fit (1=Sigmoidal Mixed Model, 2=Piecewise Mixed Model with abrupt change, 3=Piecewise Mixed Model with smooth transition)
-#' @param dataset data frame containing the variables ID, outcome, time, predictor.all, and predictor.par1 to predictor.par4. This data frame needs to be named "dataset" (see example below).
+#' @param dataset data frame containing the variables ID, outcome, time, predictor.all, and predictor.par1 to predictor.par4.
 #' @param ID name of the variable representing the grouping structure specified with " (e.g., "ID" representing the unique identifier of participants).
 #' @param outcome name of the time-varying variable representing the longitudinal outcome specified with " (e.g., "outcome").
-#' @param time name of the variable representing the timescale specified with " (e.g., "time"). Can be negative or positive. Note that model 1, SMM, will always report a positive value under the midpoint parameter (e.g. if the time in the data goes from 0 down to -10 and the time of the midpoint is -2, the model will report a midpoint of 2).
+#' @param time name of the variable representing the timescale specified with " (e.g., "time"), which can be negative or positive.
 #' @param predictor.all optional vector indicating the name of the variable(s) that the four main parameters of the model of interest will be adjusted to (e.g. predictor.all=c("X1","X2")). Default to NULL.
 #' @param predictor.par1 optional vector indicating the name of the variable(s) that the first main parameter of the model of interest will be adjusted to (e.g. predictor.all=c("X1","X2")). For model 1, the first parameter = last level. For models 2 and 3, first parameter = intercept. Default to NULL.
 #' @param predictor.par2 optional vector indicating the name of the variable(s) that the second main parameter of the model of interest will be adjusted to (e.g. predictor.all=c("X1","X2")). For model 1, the second parameter = initial level. For models 2 and 3, second parameter = slope before the change-point. Default to NULL.
@@ -39,7 +39,7 @@
 #'
 #' @return An object of class SaemixObject (from the existing _saemix_ R package) containing the results of
 #' the fit of the data by the non-linear mixed _model_ of interest. The _nlive_ function automatically provides
-#' (i) a spaghetti plot of the observed outcome for 70 randomly selected statistical units in the _dataset_ and
+#' (i) a spaghetti plot of the observed outcome for 70 randomly selected statistical units in the dataset and
 #' (ii) the standard _saemix_ output, including the fixed effects estimates, the variance of random effects,
 #' and Likelihood of the fitted _model_. The outputs are printed on the terminal and the numerical and
 #' graphical outputs are stored in a directory.
@@ -56,30 +56,40 @@
 #'
 #' @examples
 #'
-#' #### Fitting a piecewise mixed model with abrupt change - with no covariate
-#' \donttest{
-#' head(dataset)
-#' pmm.abrupt.fit = nlive(model=2, dataset=dataset, ID="ID", outcome="cognition", time="time")
+#' #### Fitting a sigmoidal mixed model - with no covariate
+#' \dontrun{
+#' head(dataCog)
+#' requireNamespace('nlraa')
+#' smm.fit = nlive(model=1, dataset=dataCog, ID="ID", outcome="cognition", time="time")
 #' }
-#' #### plot(pmm.abrupt.fit) to obtain the diagnostic plots to assess the
-#' #### goodness-of-fit of pmm.abrupt.fit
-#' #### psi(pmm.abrupt.fit): to obtain the estimates of individual parameters
+#'
+#' #### plot(smm.fit): diagnostic plots to assess the goodness-of-fit of smm.fit
+#' #### psi(smm.fit): estimates of individual parameters
+#'
+#' #### Fitting a piecewise mixed model with abrupt change - with no covariate
+#' \dontrun{
+#' pmm.abrupt.fit = nlive(model=2, dataset=dataCog, ID="ID", outcome="cognition", time="time")
+#' }
+#' #### plot(pmm.abrupt.fit): diagnostic plots to assess the goodness-of-fit of pmm.abrupt.fit
+#' #### psi(pmm.abrupt.fit): estimates of individual parameters
 #'
 #'
 #' #### Fitting a piecewise mixed model with smooth change - with all parameters
 #' #### adjusted for ageDeath90. Here, the nlive() function will also provide a
 #' #### plot of the estimated marginal trajectory in the whole study sample.
-#' \donttest{
-#' pmm.smooth.fit = nlive(model=3, dataset=dataset, ID="ID", outcome="cognition", time="time",
+#' \dontrun{
+#' pmm.smooth.fit = nlive(model=3, dataset=dataCog, ID="ID", outcome="cognition", time="time",
 #' predictor.all = c("ageDeath90"), traj.marg = TRUE)
 #' }
-#' #### plot(pmm.smooth.fit): to obtain the diagnostic plots to assess the
-#' #### goodness-of-fit of the model
-#' #### psi(pmm.smooth.fit): to obtain the estimates of individual parameters
+#' #### plot(pmm.smooth.fit): diagnostic plots to assess the goodness-of-fit of the model
+#' #### psi(pmm.smooth.fit): estimates of individual parameters
 #'
 #'
 #' @import Rmisc
 #' @import sitar
+#' @import nlraa
+#' @import knitr
+#' @importFrom nlraa SSlogis5
 #' @importFrom dplyr %>%
 #' @importFrom dplyr group_by
 #' @importFrom dplyr row_number
@@ -112,7 +122,6 @@
 nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predictor.par1 = NULL, predictor.par2 = NULL, predictor.par3 = NULL, predictor.par4 = NULL, start = NULL, plot.xlabel = NULL, plot.ylabel = NULL, traj.marg = FALSE, traj.marg.group = NULL, spag.plot.title = NULL, traj.marg.title = NULL, traj.marg.group.title = NULL, traj.marg.group.val = NULL){
 
   ## dataset
-  dataset         = dataset
   dataset$ID      = na.omit(dataset[,ID])
   dataset$outcome = na.omit(dataset[,outcome])
   dataset$time    = na.omit(dataset[,time])
@@ -320,6 +329,10 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
                                    verbose = F)
 
     ##
+    write.table(dataset, file = "dataset.txt")
+    dataset <- read.table('dataset.txt', header = TRUE, sep = "",dec=".")
+    path = paste0(as.character(getwd()),"/dataset.txt")
+    ##
     saemix.cog = saemixData(name.data       = dataset,
                             name.group      = ID,
                             name.predictors = time,
@@ -347,8 +360,8 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
 
     # calculation of p-values for the 4 parameters
     tab = cbind(c(model_SMM@results@name.fixed, "error"),
-                c(round(model_SMM@results@fixed.effects,4), round(model_SMM@results@respar[model_SMM@results@indx.res],4)),
-                c(round(model_SMM@results@se.fixed,4),round(model_SMM@results@se.respar[model_SMM@results@indx.res],4)))
+                c(round(model_SMM@results@fixed.effects,3), round(model_SMM@results@respar[model_SMM@results@indx.res],3)),
+                c(round(model_SMM@results@se.fixed,3),round(model_SMM@results@se.respar[model_SMM@results@indx.res],3)))
     colnames(tab) = c("Parameter","Estimate","  SE")
     wstat = as.double(tab[,2])/as.double(tab[,3])
     pval  = rep(0, length(wstat))

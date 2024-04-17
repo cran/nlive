@@ -94,8 +94,9 @@ pmm.smooth.fit = nlive.pmms(dataset=dataCog, ID="ID", outcome="cognition", time=
 
 }
 \references{
-The Piecewise linear mixed model with abrupt and polynomial smooth change are described in van den Hout A, Muniz-Terrera G, Matthews F (2011). Smooth random change point models. Statistics in Medicine, 30(6):599-610.
-The saemix R package and SAEM algorithm are described in Comets E, Lavenu A, Lavielle MM (2017). Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software, 80(3):1-41.
+Capuano AW, Wagner M. nlive: an R package to facilitate the application of the sigmoidal and random changepoint mixed models. BMC Medical Research Methodology. 2023;23(1):257.
+van den Hout A, Muniz-Terrera G, Matthews F. Smooth random change point models. Statistics in Medicine. 2011;30(6):599-610.
+Comets E, Lavenu A, Lavielle MM. Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software. 2017;80(3):1-41.
 }
 \author{
 Maude Wagner, Ana W. Capuano, Emmanuelle Comets

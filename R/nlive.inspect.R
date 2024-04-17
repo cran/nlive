@@ -27,6 +27,7 @@
 #'
 #' @references
 #'
+#' Capuano AW, Wagner M. nlive: an R package to facilitate the application of the sigmoidal and random changepoint mixed models. BMC Medical Research Methodology. 2023;23(1):257.
 #' Hadley Wickham (2016). ggplot2: elegant graphics for data analysis. Springer.
 #'
 #' @examples

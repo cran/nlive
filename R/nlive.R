@@ -48,11 +48,15 @@
 #'
 #' \email{maude_wagner@@rush.edu}
 #'
+#' @seealso
+#'
+#' \code{\link{nlive.smm}}, \code{\link{nlive.pmma}}, \code{\link{nlive.pmms}}
+#'
 #' @references
 #'
-#' The Sigmoidal mixed model formulation and computational methods are described in Capuano A, Wilson R, Leurgans S, Dawson J, Bennett D, Hedecker D (2018). Sigmoidal mixed models for longitudinal data. Statistical Methods in Medical Research, 27(3):863-875.
-#' The Piecewise linear mixed model with abrupt and polynomial smooth change are described in van den Hout A, Muniz-Terrera G, Matthews F (2011). Smooth random change point models. Statistics in Medicine, 30(6):599-610.
-#' The saemix R package and SAEM algorithm are described in Comets E, Lavenu A, Lavielle MM (2017). Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software, 80(3):1-41.
+#' Capuano AW, Wagner M. nlive: an R package to facilitate the application of the sigmoidal and random changepoint mixed models. BMC Medical Research Methodology. 2023;23(1):257.
+#' van den Hout A, Muniz-Terrera G, Matthews F. Smooth random change point models. Statistics in Medicine. 2011;30(6):599-610.
+#' Comets E, Lavenu A, Lavielle MM. Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software. 2017;80(3):1-41.
 #'
 #' @examples
 #'
@@ -116,27 +120,142 @@
 #' @importFrom stats quantile
 #' @importFrom stats na.omit
 #' @importFrom sqldf sqldf
+#' @importFrom fastDummies dummy_cols
 #'
 #' @export
 
-nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predictor.par1 = NULL, predictor.par2 = NULL, predictor.par3 = NULL, predictor.par4 = NULL, start = NULL, plot.xlabel = NULL, plot.ylabel = NULL, traj.marg = FALSE, traj.marg.group = NULL, spag.plot.title = NULL, traj.marg.title = NULL, traj.marg.group.title = NULL, traj.marg.group.val = NULL){
+nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL,
+                  predictor.par1 = NULL,
+                  predictor.par2 = NULL,
+                  predictor.par3 = NULL,
+                  predictor.par4 = NULL,
+                  start = NULL,
+                  plot.xlabel = NULL,
+                  plot.ylabel = NULL,
+                  traj.marg = FALSE,
+                  traj.marg.group = NULL,
+                  spag.plot.title = NULL,
+                  traj.marg.title = NULL,
+                  traj.marg.group.title = NULL,
+                  traj.marg.group.val = NULL){
+
+
+  if (missing(model))
+    stop("The argument model must be specified in any model")
+  if (missing(dataset))
+    stop("The argument dataset should be specified and defined as a data.frame")
+  if (nrow(dataset) == 0)
+    stop("Data should not be empty")
+  if (missing(ID))
+    stop("The argument ID must be specified in any model")
+  if (!is.numeric(dataset[[ID]]))
+    stop("The argument ID must be numeric")
+  if (missing(outcome))
+    stop("The argument outcome must be specified in any model")
+  if (!is.numeric(dataset[[outcome]]))
+    stop("The argument outcome must be numeric")
+  if (missing(time))
+    stop("The argument time must be specified in any model")
+  if (!is.numeric(dataset[[time]]))
+    stop("The argument time must be numeric")
+  if (!is.null(predictor.all) & !is.vector(predictor.all))
+    stop("The argument predictor.all should receive a vector indicating the name of the variable(s) that the four main parameters of the model will be adjusted to.")
+  if (!is.null(predictor.par1) & !is.vector(predictor.par1))
+    stop("The argument var.first.level should receive a vector indicating the name of the variable(s) that the first main parameters of the model will be adjusted to.")
+  if (!is.null(predictor.par2) & !is.vector(predictor.par2))
+    stop("The argument var.last.level should receive a vector indicating the name of the variable(s) that the second main parameters of the model will be adjusted to.")
+  if (!is.null(predictor.par3) & !is.vector(predictor.par3))
+    stop("The argument var.midpoint should receive a vector indicating the name of the variable(s) that the third main parameters of the model will be adjusted to.")
+  if (!is.null(predictor.par4) & !is.vector(predictor.par4))
+    stop("The argument var.Hslope should receive a vector indicating the name of the variable(s) that the fourth main parameters of the model will be adjusted to.")
+  if (!is.null(start) & !is.vector(start))
+    stop("The argument start must be a vector specifying the four initial values for the four main parameters in the following order: c(last level, initial level, midpoint, Hill slope).")
+
+  if (!is.null(traj.marg.group) & is.null(predictor.all) & is.null(predictor.par1) & is.null(predictor.par2) & is.null(predictor.par3) & is.null(predictor.par4))
+    stop("The covariate in traj.marg.group should also be in at least one of these arguments: predictor.all, predictor.par1, predictor.par2, predictor.par3, predictor.par4.")
+  if (!is.null(traj.marg.group.val) & is.null(predictor.all) & is.null(predictor.par1) & is.null(predictor.par2) & is.null(predictor.par3) & is.null(predictor.par4))
+    stop("The values in traj.marg.group.val are not used because no covariate specified in the argument traj.marg.group.")
+
+
 
   ## dataset
   dataset$ID      = na.omit(dataset[,ID])
   dataset$outcome = na.omit(dataset[,outcome])
   dataset$time    = na.omit(dataset[,time])
 
-  ## total nb of -unique- covariates
-  x          = unique(unlist(as.list(c(predictor.all, predictor.par1, predictor.par2, predictor.par3, predictor.par4))))
+
+  ##########################################
+  ## accounting for categorical variables ##
+  ##########################################
+
+  ## predictor.all
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(predictor.all)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) {predictor.all2 = predictor.all } else if (length(names_col) > 0) {
+    data_subset2    = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    predictor.all2  = as.vector(colnames(data_subset2))
+  }
+
+  ## predictor.par1
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(predictor.par1)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { predictor.par1_2 = predictor.par1 } else if (length(names_col) > 0) {
+    data_subset2    = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    predictor.par1_2 = as.vector(colnames(data_subset2))
+  }
+
+  ## predictor.par2
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(predictor.par2)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { predictor.par2_2 = predictor.par2 } else if (length(names_col) > 0) {
+    data_subset2  = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    predictor.par2_2  = as.vector(colnames(data_subset2))
+  }
+
+  ## predictor.par3
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(predictor.par3)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { predictor.par3_2 = predictor.par3 } else if (length(names_col) > 0) {
+    data_subset2  = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    predictor.par3_2  = as.vector(colnames(data_subset2))
+  }
+
+  ## predictor.par4
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(predictor.par4)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { predictor.par4_2 = predictor.par4 } else if (length(names_col) > 0) {
+    data_subset2     = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    predictor.par4_2 = as.vector(colnames(data_subset2))
+  }
+
+  ## definition of nb_cov & predictors & new data_subset with dummy variables (if any)
+  x          = unique(unlist(as.list(c(predictor.all2, predictor.par1_2, predictor.par2_2, predictor.par3_2, predictor.par4_2))))
   nb_cov     = length(x)
   predictors = unique(x)
+  ##  New dataset with dummy var (if any)
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(predictor.all, predictor.par1, predictor.par2, predictor.par3, predictor.par4)))))
+  factor_cols0 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col    = names(which(factor_cols0 == T))
+  dataset2 = dummy_cols(dataset, select_columns = names_col, remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
 
+  ## remove NA from predictors (if any)
   if (length(predictors) > 0){
     for (i in 1:length(predictors)){
-      dataset = subset(dataset, is.na(dataset[,predictors[i]]) == F)
+      dataset2 = subset(dataset2, is.na(dataset2[,predictors[i]]) == F)
       i = i + 1
     }
   }
+
 
   ## Values used throughout the code
   first    = as.data.frame(dataset %>% group_by(ID) %>% filter(row_number(ID) == 1))
@@ -153,7 +272,7 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
   if (is.null(spag.plot.title)  == T){main.spag.lab ="Spaghetti plot, random sample of 70 individuals"} else if (is.null(spag.plot.title) == F){main.spag.lab = spag.plot.title}
   if (is.null(traj.marg.title) == T){main.traj.marg = "Marginal estimated trajectories"} else if (is.null(traj.marg.title) == F){main.traj.marg = traj.marg.title}
   if (is.null(traj.marg.group.title) == T){main.traj.marg.group = "Marginal estimated trajectories between groups"} else if (is.null(traj.marg.group.title) == F){main.traj.marg.group = traj.marg.group.title}
-  if (is.null(traj.marg.group.val) == T){ percentiles = c(0.1,0.9)} else if (is.null(traj.marg.group.val) == F){percentiles = traj.marg.group.val}
+  if (is.null(traj.marg.group.val) == T){percentiles = c(0.1,0.9)} else if (is.null(traj.marg.group.val) == F){percentiles = traj.marg.group.val}
 
   #############################################
   ######          SPAGHETTI PLOT         ######
@@ -329,7 +448,7 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
                                    verbose = F)
 
     ##
-    write.table(dataset, file = "dataset.txt")
+    write.table(dataset2, file = "dataset.txt")
     dataset <- read.table('dataset.txt', header = TRUE, sep = "",dec=".")
     path = paste0(as.character(getwd()),"/dataset.txt")
     ##
@@ -359,7 +478,7 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
     coef.SMM  = model_SMM@results@fixed.effects
 
     # calculation of p-values for the 4 parameters
-    tab = cbind(c(model_SMM@results@name.fixed, "error"),
+    tab = cbind(c(model_SMM@results@name.fixed, "residual standard error"),
                 c(round(model_SMM@results@fixed.effects,3), round(model_SMM@results@respar[model_SMM@results@indx.res],3)),
                 c(round(model_SMM@results@se.fixed,3),round(model_SMM@results@se.respar[model_SMM@results@indx.res],3)))
     colnames(tab) = c("Parameter","Estimate","  SE")
@@ -764,7 +883,7 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
                             name.covariates = predictors,
                             verbose = F)
     ##
-    saemix.options = saemixControl(map = F,
+    saemix.options = saemixControl(map = F, print = F,
                                    nbiter.saemix = c(300,100), # nb of iterations for the exploration and smoothing phase
                                    nbiter.burn = 20,           # nb of iterations for burning
                                    nbiter.mcmc = c(5,5,5,0),   # nb of iterations in each kernel during the MCMC step
@@ -793,9 +912,6 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
     tab = as.data.frame(tab)
     tab$`p-value` = ifelse(tab$`p-value` == "0", "P<.0001", tab$`p-value`)
     tab
-    # output
-    print(tab)
-    cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
 
 
     ##########################################################
@@ -1152,5 +1268,9 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL, predi
              col=c("cyan4","red"), legend = c(group0,group1), cex=0.9)
     }
   }
-  return(model.fit)
+  # output
+  print(list(model.fit, tab))
+  cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
+  return(list(model.fit, tab))
+
 }

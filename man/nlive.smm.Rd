@@ -95,8 +95,9 @@ smm.fit = nlive.smm(dataset=dataCog, ID="ID", outcome="cognition", time="time")
 
 }
 \references{
-The Sigmoidal mixed model formulation and computational methods are described in Capuano A, Wilson R, Leurgans S, Dawson J, Bennett D, Hedecker D (2018). Sigmoidal mixed models for longitudinal data. Statistical Methods in Medical Research, 27(3):863-875.
-The saemix R package and SAEM algorithm are described in Comets E, Lavenu A, Lavielle MM (2017). Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software, 80(3):1-41.
+Capuano AW, Wagner M. nlive: an R package to facilitate the application of the sigmoidal and random changepoint mixed models. BMC Medical Research Methodology. 2023;23(1):257.
+van den Hout A, Muniz-Terrera G, Matthews F. Smooth random change point models. Statistics in Medicine. 2011;30(6):599-610.
+Comets E, Lavenu A, Lavielle MM. Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software. 2017;80(3):1-41.
 }
 \author{
 Maude Wagner, Ana W. Capuano, Emmanuelle Comets

@@ -44,8 +44,9 @@
 #'
 #' @references
 #'
-#' The Sigmoidal mixed model formulation and computational methods are described in Capuano A, Wilson R, Leurgans S, Dawson J, Bennett D, Hedecker D (2018). Sigmoidal mixed models for longitudinal data. Statistical Methods in Medical Research, 27(3):863-875.
-#' The saemix R package and SAEM algorithm are described in Comets E, Lavenu A, Lavielle MM (2017). Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software, 80(3):1-41.
+#' Capuano AW, Wagner M. nlive: an R package to facilitate the application of the sigmoidal and random changepoint mixed models. BMC Medical Research Methodology. 2023;23(1):257.
+#' van den Hout A, Muniz-Terrera G, Matthews F. Smooth random change point models. Statistics in Medicine. 2011;30(6):599-610.
+#' Comets E, Lavenu A, Lavielle MM. Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software. 2017;80(3):1-41.
 #'
 #' @examples
 #'
@@ -90,6 +91,7 @@
 #' @importFrom stats quantile
 #' @importFrom stats na.omit
 #' @importFrom sqldf sqldf
+#' @importFrom fastDummies dummy_cols
 #'
 #' @export
 ########
@@ -137,32 +139,93 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
   if (!is.null(start) & !is.vector(start))
     stop("The argument start must be a vector specifying the four initial values for the four main parameters in the following order: c(last level, initial level, midpoint, Hill slope).")
 
-  #require(nlraa)
-  # install.packages("nlraa")
-  # library(nlraa)
-  ## dataset
+  if (!is.null(traj.marg.group) & is.null(var.all) & is.null(var.first.level) & is.null(var.last.level) & is.null(var.midpoint) & is.null(var.Hslope))
+    stop("The covariate in traj.marg.group should also be in at least one of these arguments: var.all, var.first.level, var.first.level, var.first.level.")
+  if (!is.null(traj.marg.group.val) & is.null(var.all) & is.null(var.first.level) & is.null(var.last.level) & is.null(var.midpoint) & is.null(var.Hslope))
+    stop("The values in traj.marg.group.val are not used because no covariate specified in the argument traj.marg.group.")
 
+
+
+  ## dataset
   dataset$ID      = na.omit(dataset[,ID])
   dataset$outcome = na.omit(dataset[,outcome])
   dataset$time    = na.omit(dataset[,time])
 
-  ## total nb of -unique- covariates
-  x          = unique(unlist(as.list(c(var.all, var.last.level, var.first.level, var.midpoint, var.Hslope))))
+
+  ##########################################
+  ## accounting for categorical variables ##
+  ##########################################
+
+  ## var.all
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.all)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { var.all2 = var.all } else if (length(names_col) > 0) {
+    data_subset2    = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    var.all2        = as.vector(colnames(data_subset2))
+  }
+
+  ## var.first.level
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.first.level)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { var.first.level2 = var.first.level } else if (length(names_col) > 0) {
+    data_subset2    = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    var.first.level2 = as.vector(colnames(data_subset2))
+  }
+
+  ## var.last.level
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.last.level)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { var.last.level2 = var.last.level } else if (length(names_col) > 0) {
+    data_subset2  = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    var.last.level2  = as.vector(colnames(data_subset2))
+  }
+
+  ## var.midpoint
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.midpoint)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { var.midpoint2 = var.midpoint } else if (length(names_col) > 0) {
+    data_subset2  = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    var.midpoint2  = as.vector(colnames(data_subset2))
+  }
+
+  ## var.Hslope
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.Hslope)))))
+  factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col       = names(which(factor_cat_sup2 == T))
+  ##  Dummy coding when nlevels(var.factor) > 2
+  if (length(names_col) == 0) { var.Hslope2 = var.Hslope } else if (length(names_col) > 0) {
+    data_subset2     = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    var.Hslope2 = as.vector(colnames(data_subset2))
+  }
+
+  ## definition of nb_cov & predictors & new data_subset with dummy variables (if any)
+  x          = unique(unlist(as.list(c(var.all2, var.first.level2, var.last.level2, var.midpoint2, var.Hslope2))))
   nb_cov     = length(x)
   predictors = unique(x)
+  ##  New dataset with dummy var (if any)
+  data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.all, var.first.level, var.last.level, var.midpoint, var.Hslope)))))
+  factor_cols0 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+  names_col    = names(which(factor_cols0 == T))
+  dataset2 = dummy_cols(dataset, select_columns = names_col, remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
 
+  ## remove NA from predictors (if any)
   if (length(predictors) > 0){
     for (i in 1:length(predictors)){
-      dataset = subset(dataset, is.na(dataset[,predictors[i]]) == F)
+      dataset2 = subset(dataset2, is.na(dataset2[,predictors[i]]) == F)
       i = i + 1
     }
   }
 
-  ## Values used throughout the code
-  first    = as.data.frame(dataset %>% group_by(ID) %>% filter(row_number(ID) == 1))
-  nb_indiv = dim(first)[1]
-  nb_line  = dim(dataset)[1]
-  nb_col   = dim(dataset)[2]
+
+
 
   ## Options
   # common to all plots #
@@ -263,57 +326,57 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
 
       mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
 
-    } else if (is.null(var.all)==F & nb_cov == length(var.all)){  ##!!!!!!!
+    } else if (is.null(var.all)==F & nb_cov == length(var.all2)){
 
       mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
-      y = unique(unlist(as.list(var.all)))
+      y = unique(unlist(as.list(var.all2)))
       y = as.list(y)
       rownames(mat_predictor) = y
 
-    } else if (is.null(var.all)==F & nb_cov != length(var.all)){
+    } else if (is.null(var.all)==F & nb_cov != length(var.all2)){
       # y related to all parameters
-      mat.all = matrix(1, ncol=4, nrow=length(var.all))
-      y = unique(unlist(as.list(var.all)))
+      mat.all = matrix(1, ncol=4, nrow=length(var.all2))
+      y = unique(unlist(as.list(var.all2)))
       y = as.list(y)
       rownames(mat.all) = y
       # x related to other than all parameters
-      mat.tempo = matrix(0, ncol=4, nrow=nb_cov-length(var.all))
-      x = unique(unlist(as.list(c(var.last.level, var.first.level, var.midpoint, var.Hslope))))
+      mat.tempo = matrix(0, ncol=4, nrow=nb_cov-length(var.all2))
+      x = unique(unlist(as.list(c(var.last.level2, var.first.level2, var.midpoint2, var.Hslope2))))
       x = as.list(x)
       rownames(mat.tempo) = x
 
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.last.level)){mat.tempo[i,1] = 1}
+        if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.first.level)){mat.tempo[i,2] = 1}
+        if (isTRUE(x[i] %in% var.first.level2)){mat.tempo[i,2] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.midpoint)){mat.tempo[i,3] = 1}
+        if (isTRUE(x[i] %in% var.midpoint2)){mat.tempo[i,3] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.Hslope)){mat.tempo[i,4] = 1}
+        if (isTRUE(x[i] %in% var.Hslope2)){mat.tempo[i,4] = 1}
       }
       mat_predictor = rbind(mat.all,mat.tempo)
 
     } else if (is.null(var.all)==T & nb_cov != 0){
       # x related to other than all parameters
       mat.tempo = matrix(0, ncol=4, nrow=nb_cov)
-      x = unique(unlist(as.list(c(var.last.level, var.first.level, var.midpoint, var.Hslope))))
+      x = unique(unlist(as.list(c(var.last.level2, var.first.level2, var.midpoint2, var.Hslope2))))
       x = as.list(x)
       rownames(mat.tempo) = x
 
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.last.level)){mat.tempo[i,1] = 1}
+        if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.first.level)){mat.tempo[i,2] = 1}
+        if (isTRUE(x[i] %in% var.first.level2)){mat.tempo[i,2] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.midpoint)){mat.tempo[i,3] = 1}
+        if (isTRUE(x[i] %in% var.midpoint2)){mat.tempo[i,3] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.Hslope)){mat.tempo[i,4] = 1}
+        if (isTRUE(x[i] %in% var.Hslope2)){mat.tempo[i,4] = 1}
       }
       mat_predictor = rbind(mat.tempo)
 
@@ -331,7 +394,7 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
                                    covariance.model = varCov,
                                    verbose = F)
     #
-    write.table(dataset, file = "dataset.txt")
+    write.table(dataset2, file = "dataset.txt")
     dataset <- read.table('dataset.txt', header = TRUE, sep = "",dec=".")
     path = paste0(as.character(getwd()),"/dataset.txt")
     ##
@@ -342,7 +405,7 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
                             name.covariates = predictors,
                             verbose = F)
     ##
-    saemix.options = saemixControl(map = F,
+    saemix.options = saemixControl(map = F,print = F,
                                    nbiter.saemix = c(300,100), # nb of iterations for the exploration and smoothing phase
                                    nbiter.burn = 20,           # nb of iterations for burning
                                    nbiter.mcmc = c(5,5,5,0),   # nb of iterations in each kernel during the MCMC step
@@ -361,19 +424,18 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
     coef.SMM  = model_SMM@results@fixed.effects
 
     # calculation of p-values for the 4 parameters
-    tab = cbind(c(model_SMM@results@name.fixed, "error"),
-                c(round(model_SMM@results@fixed.effects,3), round(model_SMM@results@respar[model_SMM@results@indx.res],3)),
-                c(round(model_SMM@results@se.fixed,3),round(model_SMM@results@se.respar[model_SMM@results@indx.res],3)))
+    tab = cbind(c(model_SMM@results@name.fixed, "residual standard error"),
+                c(round(model_SMM@results@fixed.effects,6), round(model_SMM@results@respar[model_SMM@results@indx.res],6)),
+                c(round(model_SMM@results@se.fixed,6),round(model_SMM@results@se.respar[model_SMM@results@indx.res],6)))
     #
     if (mean(dataset[,time]) < 0){tab[which((unique(unlist(as.list(tab))))=="midpoint"),2] = paste0("-",tab[which((unique(unlist(as.list(tab))))=="midpoint"),2],collapse="")}
     #
     colnames(tab) = c("Parameter","Estimate","  SE")
     wstat = as.double(tab[,2])/as.double(tab[,3])
     pval  = rep(0, length(wstat))
-    pval2 = round(1 - normcdf(abs(wstat[1:length(pval)])), 4)
+    pval2 = round(1 - normcdf(abs(wstat[1:length(pval)])), 6)
     tab   = cbind(tab,"p-value" = pval2)
     tab = as.data.frame(tab)
-    tab
     tab$`p-value` = ifelse(tab$`p-value` == "0", "P<.0001", tab$`p-value`)
     tab
 
@@ -609,7 +671,9 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
     }
 
     # output
-    print(tab)
+    print(list(model.fit, tab))
     cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
-    return(model.fit)
+    return(list(model.fit, tab))
+
+
 }

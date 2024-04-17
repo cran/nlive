@@ -45,9 +45,9 @@
 #' \email{maude_wagner@@rush.edu}
 #'
 #' @references
-#'
-#' The Piecewise linear mixed model with abrupt and polynomial smooth change are described in van den Hout A, Muniz-Terrera G, Matthews F (2011). Smooth random change point models. Statistics in Medicine, 30(6):599-610.
-#' The saemix R package and SAEM algorithm are described in Comets E, Lavenu A, Lavielle MM (2017). Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software, 80(3):1-41.
+#' Capuano AW, Wagner M. nlive: an R package to facilitate the application of the sigmoidal and random changepoint mixed models. BMC Medical Research Methodology. 2023;23(1):257.
+#' van den Hout A, Muniz-Terrera G, Matthews F. Smooth random change point models. Statistics in Medicine. 2011;30(6):599-610.
+#' Comets E, Lavenu A, Lavielle MM. Parameter estimation in nonlinear mixed effect models using saemix, an R implementation of the SAEM algorithm. Journal of Statistical Software. 2017;80(3):1-41.
 #'
 #' @examples
 #'
@@ -91,6 +91,7 @@
 #' @importFrom stats quantile
 #' @importFrom stats na.omit
 #' @importFrom sqldf sqldf
+#' @importFrom fastDummies dummy_cols
 #'
 #' @export
 ########
@@ -139,51 +140,103 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
     if (!is.null(start) & !is.vector(start))
       stop("The argument start must be a vector specifying the four initial values for the four main parameters in the following order: c(last level, initial level, midpoint, Hill slope).")
 
+  if (!is.null(traj.marg.group) & is.null(var.all) & is.null(var.last.level) & is.null(var.slope1) & is.null(var.slope2) & is.null(var.changepoint))
+    stop("The covariate in traj.marg.group should also be in at least one of these arguments: var.all, var.first.level, var.first.level, var.first.level.")
+  if (!is.null(traj.marg.group.val) & is.null(var.all) & is.null(var.last.level) & is.null(var.slope1) & is.null(var.slope2) & is.null(var.changepoint))
+    stop("The values in traj.marg.group.val are not used because no covariate specified in the argument traj.marg.group.")
 
-  ## dataset
-  #dataset = as.data.frame(dataset)
-  dataset$ID      = na.omit(dataset[,ID])
-  dataset$outcome = na.omit(dataset[,outcome])
-  dataset$time    = na.omit(dataset[,time])
 
-  ## total nb of -unique- covariates
-  x          = unique(unlist(as.list(c(var.all, var.last.level, var.slope1, var.slope2, var.changepoint))))
-  nb_cov     = length(x)
-  predictors = unique(x)
+    ## dataset
+    dataset$ID      = na.omit(dataset[,ID])
+    dataset$outcome = na.omit(dataset[,outcome])
+    dataset$time    = na.omit(dataset[,time])
 
-  if (length(predictors) > 0){
-    for (i in 1:length(predictors)){
-      dataset = subset(dataset, is.na(dataset[,predictors[i]]) == F)
-      i = i + 1
+    ##########################################
+    ## accounting for categorical variables ##
+    ##########################################
+
+    ## var.all
+    data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.all)))))
+    factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+    names_col       = names(which(factor_cat_sup2 == T))
+    ##  Dummy coding when nlevels(var.factor) > 2
+    if (length(names_col) == 0) { var.all2 = var.all } else if (length(names_col) > 0) {
+      data_subset2    = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+      var.all2        = as.vector(colnames(data_subset2))
     }
-  }
 
-  ## Values used throughout the code
-  first    = as.data.frame(dataset %>% group_by(ID) %>% filter(row_number(ID) == 1))
-  nb_indiv = dim(first)[1]
-  nb_line  = dim(dataset)[1]
-  nb_col   = dim(dataset)[2]
+    ## var.last.level
+    data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.last.level)))))
+    factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+    names_col       = names(which(factor_cat_sup2 == T))
+    ##  Dummy coding when nlevels(var.factor) > 2
+    if (length(names_col) == 0) { var.last.level2 = var.last.level } else if (length(names_col) > 0) {
+      data_subset2    = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+      var.last.level2 = as.vector(colnames(data_subset2))
+    }
 
-  ## Options
-  # common to all plots #
-  if (is.null(plot.xlabel) == T){x.lab = time} else if (is.null(plot.xlabel) == F){x.lab = plot.xlabel}
-  if (is.null(plot.ylabel) == T){y.lab = outcome} else if (is.null(plot.ylabel) == F){y.lab = plot.ylabel}
+    ## var.slope1
+    data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.slope1)))))
+    factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+    names_col       = names(which(factor_cat_sup2 == T))
+    ##  Dummy coding when nlevels(var.factor) > 2
+    if (length(names_col) == 0) { var.slope1_2 = var.slope1 } else if (length(names_col) > 0) {
+      data_subset2  = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+      var.slope1_2  = as.vector(colnames(data_subset2))
+    }
 
-  # specific #
-  if (is.null(traj.marg.title) == T){main.traj.marg = "Marginal estimated trajectories"} else if (is.null(traj.marg.title) == F){main.traj.marg = traj.marg.title}
-  if (is.null(traj.marg.group.title) == T){main.traj.marg.group = "Marginal estimated trajectories between groups"} else if (is.null(traj.marg.group.title) == F){main.traj.marg.group = traj.marg.group.title}
-  if (is.null(traj.marg.group.val) == T){ percentiles = c(0.1,0.9)} else if (is.null(traj.marg.group.val) == F){percentiles = traj.marg.group.val}
+    ## var.slope2
+    data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.slope2)))))
+    factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+    names_col       = names(which(factor_cat_sup2 == T))
+    ##  Dummy coding when nlevels(var.factor) > 2
+    if (length(names_col) == 0) { var.slope2_2 = var.slope2 } else if (length(names_col) > 0) {
+      data_subset2  = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+      var.slope2_2  = as.vector(colnames(data_subset2))
+    }
 
+    ## var.changepoint
+    data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.changepoint)))))
+    factor_cat_sup2 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+    names_col       = names(which(factor_cat_sup2 == T))
+    ##  Dummy coding when nlevels(var.factor) > 2
+    if (length(names_col) == 0) { var.changepoint2 = var.changepoint } else if (length(names_col) > 0) {
+      data_subset2     = dummy_cols(data_subset, select_columns = names(which(factor_cat_sup2 == T)), remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+      var.changepoint2 = as.vector(colnames(data_subset2))
+    }
 
+    ## definition of nb_cov & predictors & new data_subset with dummy variables (if any)
+    x          = unique(unlist(as.list(c(var.all2, var.last.level2, var.slope1_2, var.slope2_2, var.changepoint2))))
+    nb_cov     = length(x)
+    predictors = unique(x)
+    ##  New dataset with dummy var (if any)
+    data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.all, var.last.level, var.slope1, var.slope2, var.changepoint)))))
+    factor_cols0 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
+    names_col    = names(which(factor_cols0 == T))
+    dataset2 = dummy_cols(dataset, select_columns = names_col, remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
 
+    ## remove NA from predictors (if any)
+    if (length(predictors) > 0){
+      for (i in 1:length(predictors)){
+        dataset2 = subset(dataset2, is.na(dataset2[,predictors[i]]) == F)
+        i = i + 1
+      }
+    }
 
+    ## Options
+    # common to all plots #
+    if (is.null(plot.xlabel) == T){x.lab = time} else if (is.null(plot.xlabel) == F){x.lab = plot.xlabel}
+    if (is.null(plot.ylabel) == T){y.lab = outcome} else if (is.null(plot.ylabel) == F){y.lab = plot.ylabel}
 
+    # specific #
+    if (is.null(traj.marg.title) == T){main.traj.marg = "Marginal estimated trajectories"} else if (is.null(traj.marg.title) == F){main.traj.marg = traj.marg.title}
+    if (is.null(traj.marg.group.title) == T){main.traj.marg.group = "Marginal estimated trajectories between groups"} else if (is.null(traj.marg.group.title) == F){main.traj.marg.group = traj.marg.group.title}
+    if (is.null(traj.marg.group.val) == T){ percentiles = c(0.1,0.9)} else if (is.null(traj.marg.group.val) == F){percentiles = traj.marg.group.val}
 
-
-  ######################################
-  ######  PIECEWISE MIXED MODELS  ######
-  ######    (models in c(2,3)     ######
-  ######################################
+    ######################################
+    ######  PIECEWISE MIXED MODELS  ######
+    ######    (models in c(2,3)     ######
+    ######################################
 
     ## SPECIFICATION - ABRUPT CHANGE ##
     model_fct = function(psi, ID, xidep){
@@ -196,12 +249,14 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       I2 = as.numeric(t >  changepoint)
       Y_pred = I1*(last.level + slope2*changepoint + slope1*(t - changepoint)) + I2*(last.level + slope2*t)
       return(Y_pred)
-      }
+    }
 
 
     ## CORRELATION BETWEEN n1/n2 only ##
     varCov      = diag(1, ncol=4, nrow=4)
     varCov[2,3] = varCov[3,2] = 1
+
+
 
     ## STARTING VALUES OF THE 4 PARAMETERS ##
     if (is.null(start) == T){
@@ -255,61 +310,68 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
     }
 
 
-    ## SPECIFICATION OF THE MATRIX OF COVARIATES ##
+    ## SPECIFICATION - MATRIX OF COVARIATES ##
 
+    # no predictors #
     if (nb_cov == 0) {
 
       mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
 
-    } else if (is.null(var.all)==F & nb_cov == length(var.all)){
+      # only var.all #
+    } else if (is.null(var.all)==F & nb_cov == length(var.all2)){
 
       mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
-      y = unique(unlist(as.list(var.all)))
+      y = unique(unlist(as.list(var.all2)))
       y = as.list(y)
       rownames(mat_predictor) = y
 
-    } else if (is.null(var.all)==F & nb_cov != length(var.all)){
+      #  var.all + other predictors #
+    } else if (is.null(var.all)==F & nb_cov != length(var.all2)){
 
-      mat.all = matrix(1, ncol=4, nrow=length(var.all))
-      y = unique(unlist(as.list(var.all)))
+      mat.all = matrix(1, ncol=4, nrow=length(var.all2))
+      y = unique(unlist(as.list(var.all2)))
       y = as.list(y)
       rownames(mat.all) = y
-      mat.tempo = matrix(0, ncol=4, nrow=nb_cov-length(var.all))
-      x = unique(unlist(as.list(c(var.last.level, var.slope1, var.slope2, var.changepoint))))
+      mat.tempo = matrix(0, ncol=4, nrow=nb_cov-length(var.all2))
+      x = unique(unlist(as.list(c(var.last.level2, var.slope1_2, var.slope2_2, var.changepoint2))))
       x = as.list(x)
       rownames(mat.tempo) = x
 
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.last.level)){mat.tempo[i,1] = 1}
+        if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.slope1)){mat.tempo[i,2] = 1}
+        if (isTRUE(x[i] %in% var.slope1_2)){mat.tempo[i,2] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.slope2)){mat.tempo[i,3] = 1}
+        if (isTRUE(x[i] %in% var.slope2_2)){mat.tempo[i,3] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.changepoint)){mat.tempo[i,4] = 1}
+        if (isTRUE(x[i] %in% var.changepoint2)){mat.tempo[i,4] = 1}
       }
       mat_predictor = rbind(mat.all,mat.tempo)
+
+      # no var.all but other predictors #
     } else if (is.null(var.all)==T & nb_cov != 0){
+
       # x related to other than all parameters
+
       mat.tempo = matrix(0, ncol=4, nrow=nb_cov)
-      x = unique(unlist(as.list(c(var.last.level, var.slope1, var.slope2, var.changepoint))))
+      x = unique(unlist(as.list(c(var.last.level2, var.slope1_2, var.slope2_2, var.changepoint2))))
       x = as.list(x)
       rownames(mat.tempo) = x
 
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.last.level)){mat.tempo[i,1] = 1}
+        if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.slope1)){mat.tempo[i,2] = 1}
+        if (isTRUE(x[i] %in% var.slope1_2)){mat.tempo[i,2] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.slope2)){mat.tempo[i,3] = 1}
+        if (isTRUE(x[i] %in% var.slope2_2)){mat.tempo[i,3] = 1}
       }
       for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.changepoint)){mat.tempo[i,4] = 1}
+        if (isTRUE(x[i] %in% var.changepoint2)){mat.tempo[i,4] = 1}
       }
       mat_predictor = rbind(mat.tempo)
     }
@@ -327,7 +389,7 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
                                    covariance.model = varCov,
                                    verbose = F)
 
-    write.table(dataset, file = "dataset.txt")
+    write.table(dataset2, file = "dataset.txt")
     dataset <- read.table('dataset.txt', header = TRUE, sep = "",dec=".")
     path = paste0(as.character(getwd()),"/dataset.txt")
 
@@ -339,7 +401,7 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
                             name.covariates = predictors,
                             verbose = F)
     ##
-    saemix.options = saemixControl(map = F,
+    saemix.options = saemixControl(map = F, print = F,
                                    nbiter.saemix = c(300,100), # nb of iterations for the exploration and smoothing phase
                                    nbiter.burn = 20,           # nb of iterations for burning
                                    nbiter.mcmc = c(5,5,5,0),   # nb of iterations in each kernel during the MCMC step
@@ -352,13 +414,15 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
     ptm<-proc.time()
     ## fit using the estimation function saemix()
     model_PMM = saemix(saemix.model.cog, saemix.cog, saemix.options)
+
     model.fit = model_PMM
     cost<-proc.time()-ptm
     coef.PMM  = model_PMM@results@fixed.effects
+
     # calculation of p-values for the 4 parameters
-    tab = cbind(c(model_PMM@results@name.fixed, "error"),
-                c(round(model_PMM@results@fixed.effects,3), round(model_PMM@results@respar[model_PMM@results@indx.res],3)),
-                c(round(model_PMM@results@se.fixed,3),round(model_PMM@results@se.respar[model_PMM@results@indx.res],3)))
+    tab = cbind(c(model_PMM@results@name.fixed, "residual standard error"),
+                c(round(model_PMM@results@fixed.effects,5), round(model_PMM@results@respar[model_PMM@results@indx.res],5)),
+                c(round(model_PMM@results@se.fixed,5),round(model_PMM@results@se.respar[model_PMM@results@indx.res],5)))
     colnames(tab) = c("Parameter","Estimate","  SE")
     wstat = as.double(tab[,2])/as.double(tab[,3])
     pval  = rep(0, length(wstat))
@@ -367,6 +431,8 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
     tab = as.data.frame(tab)
     tab$`p-value` = ifelse(tab$`p-value` == "0", "P<.0001", tab$`p-value`)
     tab
+
+
 
 
     ##########################################################
@@ -470,14 +536,14 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       n3_group1 = tab_traj$changepoint[1]
 
 
-        ## GROUP OF REFENCE (val == 0) ##
-        tab_traj$I1       = as.numeric(tab_traj$time <= tab_traj$changepoint)
-        tab_traj$I2       = as.numeric(tab_traj$time >  tab_traj$changepoint)
-        tab_traj$traj_PMM_group0 = tab_traj$I1*(n0_group0 + n2_group0*n3_group0 + n1_group0*(tab_traj$time - n3_group0)) +
-          tab_traj$I2*(n0_group0 + n2_group0*tab_traj$time)
-        ## SECOND GROUP (val == 1) ##
-        tab_traj$traj_PMM_group1 = tab_traj$I1*(n0_group1 + n2_group1*n3_group1 + n1_group1*(tab_traj$time - n3_group1)) +
-          tab_traj$I2*(n0_group1 + n2_group1*tab_traj$time)
+      ## GROUP OF REFENCE (val == 0) ##
+      tab_traj$I1       = as.numeric(tab_traj$time <= tab_traj$changepoint)
+      tab_traj$I2       = as.numeric(tab_traj$time >  tab_traj$changepoint)
+      tab_traj$traj_PMM_group0 = tab_traj$I1*(n0_group0 + n2_group0*n3_group0 + n1_group0*(tab_traj$time - n3_group0)) +
+        tab_traj$I2*(n0_group0 + n2_group0*tab_traj$time)
+      ## SECOND GROUP (val == 1) ##
+      tab_traj$traj_PMM_group1 = tab_traj$I1*(n0_group1 + n2_group1*n3_group1 + n1_group1*(tab_traj$time - n3_group1)) +
+        tab_traj$I2*(n0_group1 + n2_group1*tab_traj$time)
 
 
       ##
@@ -544,11 +610,11 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       n3_group0 = tab_traj_group0$changepoint[1]
 
 
-        ## GROUP OF REFENCE (val == 0) ##
-        tab_traj_group0$I1       = as.numeric(tab_traj_group0$time <= tab_traj_group0$changepoint)
-        tab_traj_group0$I2       = as.numeric(tab_traj_group0$time >  tab_traj_group0$changepoint)
-        tab_traj_group0$traj_PMM_group0 = tab_traj_group0$I1*(n0_group0 + n2_group0*n3_group0 + n1_group0*(tab_traj_group0$time - n3_group0)) +
-          tab_traj_group0$I2*(n0_group0 + n2_group0*tab_traj_group0$time)
+      ## GROUP OF REFENCE (val == 0) ##
+      tab_traj_group0$I1       = as.numeric(tab_traj_group0$time <= tab_traj_group0$changepoint)
+      tab_traj_group0$I2       = as.numeric(tab_traj_group0$time >  tab_traj_group0$changepoint)
+      tab_traj_group0$traj_PMM_group0 = tab_traj_group0$I1*(n0_group0 + n2_group0*n3_group0 + n1_group0*(tab_traj_group0$time - n3_group0)) +
+        tab_traj_group0$I2*(n0_group0 + n2_group0*tab_traj_group0$time)
 
 
       ## SECOND GROUP (val in the 90th percentile)
@@ -576,11 +642,11 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
 
 
 
-        ## SECOND GROUP (val == 1) ##
-        tab_traj_group1$I1       = as.numeric(tab_traj_group1$time <= tab_traj_group1$changepoint)
-        tab_traj_group1$I2       = as.numeric(tab_traj_group1$time >  tab_traj_group1$changepoint)
-        tab_traj_group1$traj_PMM_group1 = tab_traj_group1$I1*(n0_group1 + n2_group1*n3_group1 + n1_group1*(tab_traj_group1$time - n3_group1)) +
-          tab_traj_group1$I2*(n0_group1 + n2_group1*tab_traj_group1$time)
+      ## SECOND GROUP (val == 1) ##
+      tab_traj_group1$I1       = as.numeric(tab_traj_group1$time <= tab_traj_group1$changepoint)
+      tab_traj_group1$I2       = as.numeric(tab_traj_group1$time >  tab_traj_group1$changepoint)
+      tab_traj_group1$traj_PMM_group1 = tab_traj_group1$I1*(n0_group1 + n2_group1*n3_group1 + n1_group1*(tab_traj_group1$time - n3_group1)) +
+        tab_traj_group1$I2*(n0_group1 + n2_group1*tab_traj_group1$time)
 
 
       ##
@@ -604,10 +670,11 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
              col=c("cyan4","red"), legend = c(group0,group1), cex=0.9)
     }
 
-  # output
-  print(tab)
-  cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
-  return(model.fit)
-}
+    # output
+    print(list(model.fit, tab))
+    cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
+    return(list(model.fit, tab))
 
+
+  }
 

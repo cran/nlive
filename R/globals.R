@@ -28,4 +28,6 @@ utils::globalVariables(c("%>%",
                          'knitr',
                          "nlraa",
                          'write.table',
-                         'read.table'))
+                         'read.table',
+                         'dummy_cols',
+                         "which"))

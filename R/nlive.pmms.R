@@ -214,16 +214,17 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
   data_subset     = subset(dataset, select = unique(unlist(as.list(c(var.all, var.last.level, var.slope1, var.slope2, var.changepoint)))))
   factor_cols0 = as.list(sapply(data_subset, function(col) is.factor(col) && nlevels(col) > 2))
   names_col    = names(which(factor_cols0 == T))
-  dataset2 = dummy_cols(dataset, select_columns = names_col, remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
 
-  ## remove NA from predictors (if any)
-  if (length(predictors) > 0){
-    for (i in 1:length(predictors)){
-      dataset2 = subset(dataset2, is.na(dataset2[,predictors[i]]) == F)
-      i = i + 1
+  if (length(names_col) == 0) { dataset2 = dataset } else if (length(names_col) > 0) {
+    dataset2 = dummy_cols(dataset, select_columns = names_col, remove_first_dummy = T, ignore_na = T, remove_selected_columns = T)
+    ## remove NA from predictors (if any)
+    if (length(predictors) > 0){
+      for (i in 1:length(predictors)){
+        dataset2 = subset(dataset2, is.na(dataset2[,predictors[i]]) == F)
+        i = i + 1
+      }
     }
   }
-
 
   ## Options
   # common to all plots #

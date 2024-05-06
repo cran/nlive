@@ -440,6 +440,8 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
     ######   MARGINAL ESTIMATED TRAJECTORIES            ######
     ######   FOR THE MOST COMMON PROFILE OF COVARIATES  ######
     ##########################################################
+    dataset = dataset2
+    #
     if(traj.marg == TRUE){
       if (mean(dataset[,time]) > 0){
         min_plot = round(quantile(dataset[,time], probs=c(0.01)),0)
@@ -452,9 +454,9 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
       tab_traj = data.frame(time = seq(min_plot, max_plot, 0.1),
                             ## parameters
                             last.level  = coef.PMM[1],
-                            slope1      = coef.PMM[1*length(var.all)+length(var.last.level) + 2],
-                            slope2      = coef.PMM[2*length(var.all)+length(var.last.level)+length(var.slope1) + 3],
-                            changepoint = coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4],
+                            slope1      = coef.PMM[1*length(var.all2)+length(var.last.level2) + 2],
+                            slope2      = coef.PMM[2*length(var.all2)+length(var.last.level2)+length(var.slope1_2) + 3],
+                            changepoint = coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4],
                             ## transition parameter
                             transition = 2)
 
@@ -505,6 +507,7 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
     ################################
     #   BINARY GROUPING VARIABLE   #
     ################################
+
     if (is.null(traj.marg.group)==F & is.factor(dataset[,traj.marg.group]) == TRUE){
 
       if (mean(dataset[,time]) > 0){
@@ -519,9 +522,9 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
       tab_traj = data.frame(time = seq(min_plot, max_plot, 0.1),
                             ## parameters
                             last.level  = coef.PMM[1],
-                            slope1      = coef.PMM[1*length(var.all)+length(var.last.level) + 2],
-                            slope2      = coef.PMM[2*length(var.all)+length(var.last.level)+length(var.slope1) + 3],
-                            changepoint = coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4],
+                            slope1      = coef.PMM[1*length(var.all2)+length(var.last.level2) + 2],
+                            slope2      = coef.PMM[2*length(var.all2)+length(var.last.level2)+length(var.slope1_2) + 3],
+                            changepoint = coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4],
                             ## transition parameter
                             transition = 2)
 
@@ -536,17 +539,17 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
       tab_traj = data.frame(time = seq(min_plot, max_plot, 0.1), transition = 2)
       ##
       tab_traj$last.level  = coef.PMM[1] + coef.PMM[1+pos_raw]*mat_predictor[pos_raw,1]
-      tab_traj$slope1      = coef.PMM[1*length(var.all)+length(var.last.level) + 2] + coef.PMM[1*length(var.all)+length(var.last.level) + 2 + pos_raw]*mat_predictor[pos_raw,2]
-      tab_traj$slope2      = coef.PMM[2*length(var.all)+length(var.last.level)+length(var.slope1) + 3] + coef.PMM[2*length(var.all)+length(var.last.level)+length(var.slope1) + 3 + pos_raw]*mat_predictor[pos_raw,3]
+      tab_traj$slope1      = coef.PMM[1*length(var.all2)+length(var.last.level2) + 2] + coef.PMM[1*length(var.all2)+length(var.last.level2) + 2 + pos_raw]*mat_predictor[pos_raw,2]
+      tab_traj$slope2      = coef.PMM[2*length(var.all2)+length(var.last.level2)+length(var.slope1_2) + 3] + coef.PMM[2*length(var.all2)+length(var.last.level2)+length(var.slope1_2) + 3 + pos_raw]*mat_predictor[pos_raw,3]
 
-      if (is.na(coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4 + pos_raw])==F){
+      if (is.na(coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4 + pos_raw])==F){
 
-        tab_traj$changepoint = coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4]+
-          coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4 + pos_raw]*mat_predictor[pos_raw,4]
+        tab_traj$changepoint = coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4]+
+          coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4 + pos_raw]*mat_predictor[pos_raw,4]
 
-      } else if (is.na(coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4 + pos_raw])==T){
+      } else if (is.na(coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4 + pos_raw])==T){
 
-        tab_traj$changepoint = coef.PMM[3*length(var.all)+length(var.last.level)+length(var.slope1)+length(var.slope2) + 4]
+        tab_traj$changepoint = coef.PMM[3*length(var.all2)+length(var.last.level2)+length(var.slope1_2)+length(var.slope2_2) + 4]
 
       }
 
@@ -764,6 +767,6 @@ nlive.pmms <- function(dataset, ID, outcome, time, var.all = NULL,
   # output
     print(list(model.fit, tab))
     cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
-    return(list(model.fit, tab))
+    return(model.fit)
 
 }

@@ -89,7 +89,7 @@ nlive.inspect <- function(dataset, ID, variable, time,
   dataset$ID      = na.omit(dataset[,ID])
   dataset$variable = na.omit(dataset[,variable])
   dataset$time    = na.omit(dataset[,time])
-#  dataset$time_box = round(dataset[,time],0)
+
 
   ## Values used throughout the code
   first    = as.data.frame(dataset %>% group_by(ID) %>% filter(row_number(ID) == 1))
@@ -158,8 +158,8 @@ nlive.inspect <- function(dataset, ID, variable, time,
   #############################################
   ######            BOXPLOTS             ######
   #############################################
-  box_plot  = ggplot(dataset, aes(x =round(dataset$time,0), y = variable)) +
-    geom_boxplot(aes(fill=as.factor(round(dataset$time,0)))) +
+  box_plot  = ggplot(dataset, aes(x =round(time,0), y = variable)) +
+    geom_boxplot(aes(fill=as.factor(round(time,0)))) +
     scale_y_continuous(limits=c(min(dataset$variable), max(dataset$variable))) +
     labs(x = x.lab, y = y.lab, title = "Boxplots over time, whole sample")+
     theme(legend.position = "none")

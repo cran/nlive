@@ -1272,6 +1272,6 @@ nlive <- function(model, dataset, ID, outcome, time, predictor.all = NULL,
   # output
   print(list(model.fit, tab))
   cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
-  return(list(model.fit, tab))
+  return(model.fit)
 
 }

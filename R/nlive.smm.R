@@ -240,439 +240,444 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
   #####################################
   ######  SIGMOIDAL MIXED MODEL  ######
   #####################################
-    dataset$time_pos = abs(dataset[,time])
+  dataset$time_pos = abs(dataset[,time])
 
-    ## STARTING VALUES  ##
-    if (is.null(start) == T) {
+  ## STARTING VALUES  ##
+  if (is.null(start) == T) {
 
-      frag   = quantile(dataset$time, probs = c(0.2,0.4,0.6,0.8))
-      # interval 1
-      tab_int = subset(dataset, time <= frag[1])
-      lmm    = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
-      slope1 = mean(coef(lmm)["time"])
-      # interval 2
-      tab_int = subset(dataset, time >= frag[1] & time <= frag[2])
-      lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
-      slope2 = mean(coef(lmm)["time"])
-      # interval 3
-      tab_int = subset(dataset, time >= frag[2] & time <= frag[3])
-      lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
-      slope3 = mean(coef(lmm)["time"])
-      # interval 4
-      tab_int = subset(dataset, time >= frag[3] & time <= frag[4])
-      lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
-      slope4 = mean(coef(lmm)["time"])
-      # interval 5
-      tab_int = subset(dataset, time >= frag[4])
-      lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
-      slope5 = mean(coef(lmm)["time"])
-      ###
-      y = c(slope1,slope2,slope3,slope4,slope5)
-      val = min(y)
-      pos = frag[which(y == val)-1]
+    frag   = quantile(dataset$time, probs = c(0.2,0.4,0.6,0.8))
+    # interval 1
+    tab_int = subset(dataset, time <= frag[1])
+    lmm    = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
+    slope1 = mean(coef(lmm)["time"])
+    # interval 2
+    tab_int = subset(dataset, time >= frag[1] & time <= frag[2])
+    lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
+    slope2 = mean(coef(lmm)["time"])
+    # interval 3
+    tab_int = subset(dataset, time >= frag[2] & time <= frag[3])
+    lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
+    slope3 = mean(coef(lmm)["time"])
+    # interval 4
+    tab_int = subset(dataset, time >= frag[3] & time <= frag[4])
+    lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
+    slope4 = mean(coef(lmm)["time"])
+    # interval 5
+    tab_int = subset(dataset, time >= frag[4])
+    lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
+    slope5 = mean(coef(lmm)["time"])
+    ###
+    y = c(slope1,slope2,slope3,slope4,slope5)
+    val = min(y)
+    pos = frag[which(y == val)-1]
 
-      # last level (intercept)
-      tempo   = subset(dataset, time > quantile(dataset$time, probs=c(0.97)))
-      last.level  = mean(tempo[, outcome])
-      # first level
-      tempo   = subset(dataset, time < quantile(dataset$time, probs=c(0.05)))
-      first.level  = mean(tempo[, outcome])
-      ##
-      tempo = subset(dataset, time_pos < -pos)
-      lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
-      low   = as.numeric(coef(lmm)["time_pos"])
-      ##
-      tempo = subset(dataset, time_pos > -pos)
-      lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
-      high  = as.numeric(coef(lmm)["time_pos"])
-      c(low,high)
-      ##
-      midpoint   = ifelse(abs(low/high)> 0.5 & abs(low/high) < 1.5, 300, 2)
-      hill.slope = ifelse(abs(low/high)> 0.5 & abs(low/high) < 1.5, 1.05, 0.5)
-
-    } else if (length(start) == 4) {
-      last.level  = start[1]
-      first.level = start[2]
-      midpoint    = start[3]
-      hill.slope  = start[4]
-    }
-    c(last.level, first.level, midpoint, hill.slope)
-
-    ## CORRELATION BETWEEN n1/n2 only ##
-    varCov      = diag(0, ncol=4, nrow=4)
-    varCov[1,1] = varCov[2,2] = varCov[1,2] = varCov[2,1] = 1
-
-    ## SPECIFICATION OF THE MODEL ##
-    model_fct = function(psi, ID, xidep){
-
-      t           = xidep[, 1]
-
-      last.level  = psi[ID, 1]
-      first.level = psi[ID, 2]
-      midpoint    = psi[ID, 3]
-      hill.slope  = psi[ID, 4]
-
-      t2 = abs(t)
-      Y_pred = SSlogis5(t2, last.level, first.level, midpoint, hill.slope, theta = 1)
-
-      return(Y_pred)
-    }
-
-
-    ## SPECIFICATION OF THE MATRIX OF COVARIATES ##
-
-    if (nb_cov == 0) {
-
-      mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
-
-    } else if (is.null(var.all)==F & nb_cov == length(var.all2)){
-
-      mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
-      y = unique(unlist(as.list(var.all2)))
-      y = as.list(y)
-      rownames(mat_predictor) = y
-
-    } else if (is.null(var.all)==F & nb_cov != length(var.all2)){
-      # y related to all parameters
-      mat.all = matrix(1, ncol=4, nrow=length(var.all2))
-      y = unique(unlist(as.list(var.all2)))
-      y = as.list(y)
-      rownames(mat.all) = y
-      # x related to other than all parameters
-      mat.tempo = matrix(0, ncol=4, nrow=nb_cov-length(var.all2))
-      x = unique(unlist(as.list(c(var.last.level2, var.first.level2, var.midpoint2, var.Hslope2))))
-      x = as.list(x)
-      rownames(mat.tempo) = x
-
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
-      }
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.first.level2)){mat.tempo[i,2] = 1}
-      }
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.midpoint2)){mat.tempo[i,3] = 1}
-      }
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.Hslope2)){mat.tempo[i,4] = 1}
-      }
-      mat_predictor = rbind(mat.all,mat.tempo)
-
-    } else if (is.null(var.all)==T & nb_cov != 0){
-      # x related to other than all parameters
-      mat.tempo = matrix(0, ncol=4, nrow=nb_cov)
-      x = unique(unlist(as.list(c(var.last.level2, var.first.level2, var.midpoint2, var.Hslope2))))
-      x = as.list(x)
-      rownames(mat.tempo) = x
-
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
-      }
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.first.level2)){mat.tempo[i,2] = 1}
-      }
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.midpoint2)){mat.tempo[i,3] = 1}
-      }
-      for (i in 1:length(x)){
-        if (isTRUE(x[i] %in% var.Hslope2)){mat.tempo[i,4] = 1}
-      }
-      mat_predictor = rbind(mat.tempo)
-
-    }
-    mat_predictor
-
+    # last level (intercept)
+    tempo   = subset(dataset, time > quantile(dataset$time, probs=c(0.97)))
+    last.level  = mean(tempo[, outcome])
+    # first level
+    tempo   = subset(dataset, time < quantile(dataset$time, probs=c(0.05)))
+    first.level  = mean(tempo[, outcome])
     ##
-    saemix.model.cog = saemixModel(model = model_fct,
-                                   psi0  = rbind(c(last.level  = last.level,
-                                                   first.level = first.level,
-                                                   midpoint    = midpoint,
-                                                   hill.slope  = hill.slope),
-                                                 matrix(0, ncol=4, nrow=1)),
-                                   covariate.model  = mat_predictor,
-                                   covariance.model = varCov,
-                                   verbose = F)
-    #
-    write.table(dataset2, file = "dataset.txt")
-    dataset <- read.table('dataset.txt', header = TRUE, sep = "",dec=".")
-    path = paste0(as.character(getwd()),"/dataset.txt")
+    tempo = subset(dataset, time_pos < -pos)
+    lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
+    low   = as.numeric(coef(lmm)["time_pos"])
     ##
-    saemix.cog = saemixData(name.data       = path,
-                            name.group      = ID,
-                            name.predictors = time,
-                            name.response   = outcome,
-                            name.covariates = predictors,
-                            verbose = F)
+    tempo = subset(dataset, time_pos > -pos)
+    lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
+    high  = as.numeric(coef(lmm)["time_pos"])
+    c(low,high)
     ##
-    saemix.options = saemixControl(map = F,print = F,
-                                   nbiter.saemix = c(300,100), # nb of iterations for the exploration and smoothing phase
-                                   nbiter.burn = 20,           # nb of iterations for burning
-                                   nbiter.mcmc = c(5,5,5,0),   # nb of iterations in each kernel during the MCMC step
-                                   ll.is = T,                  # default = T (TRUE) to estimate the log-likelihood
-                                   seed = 123,
-                                   displayProgress = F,        # default = T = to output the convergence plots
-                                   save = F,                   # default = T = the results of the fit should be saved to a file
-                                   save.graphs = F)            # default = T = to save the diagnostic and individual graphs
+    midpoint   = ifelse(abs(low/high)> 0.5 & abs(low/high) < 1.5, 300, 2)
+    hill.slope = ifelse(abs(low/high)> 0.5 & abs(low/high) < 1.5, 1.05, 0.5)
+
+  } else if (length(start) == 4) {
+    last.level  = start[1]
+    first.level = start[2]
+    midpoint    = start[3]
+    hill.slope  = start[4]
+  }
+  c(last.level, first.level, midpoint, hill.slope)
+
+  ## CORRELATION BETWEEN n1/n2 only ##
+  varCov      = diag(0, ncol=4, nrow=4)
+  varCov[1,1] = varCov[2,2] = varCov[1,2] = varCov[2,1] = 1
+
+  ## SPECIFICATION OF THE MODEL ##
+  model_fct = function(psi, ID, xidep){
+
+    t           = xidep[, 1]
+
+    last.level  = psi[ID, 1]
+    first.level = psi[ID, 2]
+    midpoint    = psi[ID, 3]
+    hill.slope  = psi[ID, 4]
+
+    t2 = abs(t)
+    Y_pred = SSlogis5(t2, last.level, first.level, midpoint, hill.slope, theta = 1)
+
+    return(Y_pred)
+  }
 
 
-    ## fit
-    ptm<-proc.time()
-    model_SMM = saemix(saemix.model.cog, saemix.cog, saemix.options)
-    model.fit = model_SMM
-    cost<-proc.time()-ptm
-    coef.SMM  = model_SMM@results@fixed.effects
+  ## SPECIFICATION OF THE MATRIX OF COVARIATES ##
 
-    # calculation of p-values for the 4 parameters
-    tab = cbind(c(model_SMM@results@name.fixed, "residual standard error"),
-                c(round(model_SMM@results@fixed.effects,6), round(model_SMM@results@respar[model_SMM@results@indx.res],6)),
-                c(round(model_SMM@results@se.fixed,6),round(model_SMM@results@se.respar[model_SMM@results@indx.res],6)))
-    #
-    if (mean(dataset[,time]) < 0){tab[which((unique(unlist(as.list(tab))))=="midpoint"),2] = paste0("-",tab[which((unique(unlist(as.list(tab))))=="midpoint"),2],collapse="")}
-    #
-    colnames(tab) = c("Parameter","Estimate","  SE")
-    wstat = as.double(tab[,2])/as.double(tab[,3])
-    pval  = rep(0, length(wstat))
-    pval2 = round(1 - normcdf(abs(wstat[1:length(pval)])), 6)
-    tab   = cbind(tab,"p-value" = pval2)
-    tab = as.data.frame(tab)
-    tab$`p-value` = ifelse(tab$`p-value` == "0", "P<.0001", tab$`p-value`)
-    tab
+  if (nb_cov == 0) {
+
+    mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
+
+  } else if (is.null(var.all)==F & nb_cov == length(var.all2)){
+
+    mat_predictor = matrix(1, ncol=4, nrow=nb_cov)
+    y = unique(unlist(as.list(var.all2)))
+    y = as.list(y)
+    rownames(mat_predictor) = y
+
+  } else if (is.null(var.all)==F & nb_cov != length(var.all2)){
+    # y related to all parameters
+    mat.all = matrix(1, ncol=4, nrow=length(var.all2))
+    y = unique(unlist(as.list(var.all2)))
+    y = as.list(y)
+    rownames(mat.all) = y
+    # x related to other than all parameters
+    mat.tempo = matrix(0, ncol=4, nrow=nb_cov-length(var.all2))
+    x = unique(unlist(as.list(c(var.last.level2, var.first.level2, var.midpoint2, var.Hslope2))))
+    x = as.list(x)
+    rownames(mat.tempo) = x
+
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
+    }
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.first.level2)){mat.tempo[i,2] = 1}
+    }
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.midpoint2)){mat.tempo[i,3] = 1}
+    }
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.Hslope2)){mat.tempo[i,4] = 1}
+    }
+    mat_predictor = rbind(mat.all,mat.tempo)
+
+  } else if (is.null(var.all)==T & nb_cov != 0){
+    # x related to other than all parameters
+    mat.tempo = matrix(0, ncol=4, nrow=nb_cov)
+    x = unique(unlist(as.list(c(var.last.level2, var.first.level2, var.midpoint2, var.Hslope2))))
+    x = as.list(x)
+    rownames(mat.tempo) = x
+
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.last.level2)){mat.tempo[i,1] = 1}
+    }
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.first.level2)){mat.tempo[i,2] = 1}
+    }
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.midpoint2)){mat.tempo[i,3] = 1}
+    }
+    for (i in 1:length(x)){
+      if (isTRUE(x[i] %in% var.Hslope2)){mat.tempo[i,4] = 1}
+    }
+    mat_predictor = rbind(mat.tempo)
+
+  }
+  mat_predictor
+
+  ##
+  saemix.model.cog = saemixModel(model = model_fct,
+                                 psi0  = rbind(c(last.level  = last.level,
+                                                 first.level = first.level,
+                                                 midpoint    = midpoint,
+                                                 hill.slope  = hill.slope),
+                                               matrix(0, ncol=4, nrow=1)),
+                                 covariate.model  = mat_predictor,
+                                 covariance.model = varCov,
+                                 verbose = F)
+  #
+  write.table(dataset2, file = "dataset.txt")
+  dataset <- read.table('dataset.txt', header = TRUE, sep = "",dec=".")
+  path = paste0(as.character(getwd()),"/dataset.txt")
+  ##
+  saemix.cog = saemixData(name.data       = path,
+                          name.group      = ID,
+                          name.predictors = time,
+                          name.response   = outcome,
+                          name.covariates = predictors,
+                          verbose = F)
+  ##
+  saemix.options = saemixControl(map = F,print = F,
+                                 nbiter.saemix = c(300,100), # nb of iterations for the exploration and smoothing phase
+                                 nbiter.burn = 20,           # nb of iterations for burning
+                                 nbiter.mcmc = c(5,5,5,0),   # nb of iterations in each kernel during the MCMC step
+                                 ll.is = T,                  # default = T (TRUE) to estimate the log-likelihood
+                                 seed = 123,
+                                 displayProgress = F,        # default = T = to output the convergence plots
+                                 save = F,                   # default = T = the results of the fit should be saved to a file
+                                 save.graphs = F)            # default = T = to save the diagnostic and individual graphs
 
 
-    ### ESTIMATED MARGINAL TRAJECTORIES IN THE WHOLE SAMPLE (most common profile of covariates) ###
-    if (traj.marg == TRUE){
+  ## fit
+  ptm<-proc.time()
+  model_SMM = saemix(saemix.model.cog, saemix.cog, saemix.options)
+  model.fit = model_SMM
+  cost<-proc.time()-ptm
+  coef.SMM  = model_SMM@results@fixed.effects
+
+  # calculation of p-values for the 4 parameters
+  tab = cbind(c(model_SMM@results@name.fixed, "residual standard error"),
+              c(round(model_SMM@results@fixed.effects,6), round(model_SMM@results@respar[model_SMM@results@indx.res],6)),
+              c(round(model_SMM@results@se.fixed,6),round(model_SMM@results@se.respar[model_SMM@results@indx.res],6)))
+  #
+  if (mean(dataset[,time]) < 0){tab[which((unique(unlist(as.list(tab))))=="midpoint"),2] = paste0("-",tab[which((unique(unlist(as.list(tab))))=="midpoint"),2],collapse="")}
+  #
+  colnames(tab) = c("Parameter","Estimate","  SE")
+  wstat = as.double(tab[,2])/as.double(tab[,3])
+  pval  = rep(0, length(wstat))
+  pval2 = round(1 - normcdf(abs(wstat[1:length(pval)])), 6)
+  tab   = cbind(tab,"p-value" = pval2)
+  tab = as.data.frame(tab)
+  tab$`p-value` = ifelse(tab$`p-value` == "0", "P<.0001", tab$`p-value`)
+  tab
+
+  ##########################################################
+  ######   MARGINAL ESTIMATED TRAJECTORIES            ######
+  ######   FOR THE MOST COMMON PROFILE OF COVARIATES  ######
+  ##########################################################
+  dataset = dataset2
+  #
+  if (traj.marg == TRUE){
+    ##
+    A     = coef.SMM[1]
+    B     = coef.SMM[1*length(var.all2)+length(var.last.level2) + 2]
+    C     = coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3]
+    D     = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]
+    # marginal predictions
+    if (mean(dataset[,time]) > 0){
+      min_plot = round(quantile(dataset[,time], probs=c(0.01)),0)
+      max_plot = round(quantile(dataset[,time], probs=c(0.90)),0)
+      tab_SMM  = data.frame(time_pos = seq(min_plot, max_plot,0.1))
+      tab_SMM$traj_SMM = SSlogis5(tab_SMM$time_pos, A, B, C, D, theta=1)
+
+      plot(tab_SMM$time_pos, tab_SMM$traj_SMM,  las=1,
+           lwd  = 3, type = "l",
+           xlab = x.lab,  ylab = y.lab,
+           main = main.traj.marg,
+           col  = "cyan4",
+           legend = NULL)
+
+    } else if (mean(dataset[,time]) < 0) {
+      min_plot = round(quantile(dataset[,time], probs=c(0.1)),0)
+      max_plot = round(quantile(dataset[,time], probs=c(0.99)),0)
+      tab_SMM  = data.frame(time_neg = seq(min_plot, max_plot,0.1), time_pos = seq(-min_plot, max_plot,-0.1))
+      tab_SMM$traj_SMM = SSlogis5(tab_SMM$time_pos, A, B, C, D, theta=1)
+
+      plot(tab_SMM$time_neg, tab_SMM$traj_SMM,  las=1,
+           lwd  = 4, type = "l",
+           xlab = x.lab,  ylab = y.lab,
+           main = main.traj.marg,
+           col  = "cyan4",
+           legend = NULL)
+    }
+  }
+
+
+
+  ######################################################
+  ### ESTIMATED MARGINAL TRAJECTORIES BETWEEN GROUPS ###
+  ######################################################
+  ################################
+  #   BINARY GROUPING VARIABLE   #
+  ################################
+  if (is.null(traj.marg.group)==F & is.factor(dataset[,traj.marg.group]) == TRUE){
+
+    ## GROUP OF REFENCE (val == 0)
+    A_group0 = coef.SMM[1]
+    B_group0 = coef.SMM[1*length(var.all2)+length(var.last.level2) + 2]
+    C_group0 = coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3]
+    D_group0 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]
+
+    ## SECOND GROUP (val == 1)
+    pos_raw = which(traj.marg.group == rownames(mat_predictor))
+
+    A_group1 = coef.SMM[1]+
+      coef.SMM[1+pos_raw]*mat_predictor[pos_raw,1]
+    B_group1 = coef.SMM[1*length(var.all2)+length(var.last.level2) + 2]+
+      coef.SMM[1*length(var.all2)+length(var.last.level2) + 2 + pos_raw]*mat_predictor[pos_raw,2]
+    C_group1 = coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3]+
+      coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3 + pos_raw]*mat_predictor[pos_raw,3]
+
+    if (is.na(coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw])==F){
+
+      D_group1 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]+
+        coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw]*mat_predictor[pos_raw,4]
+
+    } else if (is.na(coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw])==T){
+
+      D_group1 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]
+
+    }
+
+    # POSITIVE TIMESCALE #
+    if (mean(dataset[,time]) > 0){
+      min_x = round(quantile(dataset[,time], probs=c(0.01)),0)
+      max_x = round(quantile(dataset[,time], probs=c(0.90)),0)
+      tab_SMM  = data.frame(time_pos = seq(min_x, max_x,0.1))
+      tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
+      tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
       ##
-      A     = coef.SMM[1]
-      B     = coef.SMM[1*length(var.all)+length(var.last.level) + 2]
-      C     = coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3]
-      D     = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]
-      # marginal predictions
-      if (mean(dataset[,time]) > 0){
-        min_plot = round(quantile(dataset[,time], probs=c(0.01)),0)
-        max_plot = round(quantile(dataset[,time], probs=c(0.90)),0)
-        tab_SMM  = data.frame(time_pos = seq(min_plot, max_plot,0.1))
-        tab_SMM$traj_SMM = SSlogis5(tab_SMM$time_pos, A, B, C, D, theta=1)
+      min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      ##
+      plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
+           lwd  = 5, type = "l",
+           xlab = x.lab,  ylab = y.lab,
+           ylim = c(min_y, max_y),
+           main = main.traj.marg.group,
+           col  = "cyan4",
+           legend = NULL)
+      points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
+             lty=3, lwd = 3, type = "l")
+      # legend
+      group0 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[1], collapse = ""))
+      group1 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[2], collapse = ""))
+      legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
+             col=c("cyan4","red"), legend = c(group0,group1))
 
-        plot(tab_SMM$time_pos, tab_SMM$traj_SMM,  las=1,
-             lwd  = 3, type = "l",
-             xlab = x.lab,  ylab = y.lab,
-             main = main.traj.marg,
-             col  = "cyan4",
-             legend = NULL)
+      # NEGATIVE TIMESCALE #
+    } else if (mean(dataset[,time]) < 0) {
 
-      } else if (mean(dataset[,time]) < 0) {
-        min_plot = round(quantile(dataset[,time], probs=c(0.1)),0)
-        max_plot = round(quantile(dataset[,time], probs=c(0.99)),0)
-        tab_SMM  = data.frame(time_neg = seq(min_plot, max_plot,0.1), time_pos = seq(-min_plot, max_plot,-0.1))
-        tab_SMM$traj_SMM = SSlogis5(tab_SMM$time_pos, A, B, C, D, theta=1)
+      min_x = round(quantile(dataset[,time], probs=c(0.1)),0)
+      max_x = round(quantile(dataset[,time], probs=c(0.99)),0)
+      tab_SMM  = data.frame(time_neg = seq(min_x, max_x,0.1), time_pos = seq(-min_x, max_x,-0.1))
+      tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
+      tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
+      ##
+      min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      ##
+      plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
+           lwd  = 5, type = "l",
+           xlab = x.lab,  ylab = y.lab,
+           ylim = c(min_y, max_y),
+           main = main.traj.marg.group,
+           col  = "cyan4",
+           legend = NULL)
+      points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
+             lty=3, lwd = 3, type = "l")
+      # legend
+      group0 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[1], collapse = ""))
+      group1 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[2], collapse = ""))
+      legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
+             col=c("cyan4","red"), legend = c(group0,group1))
+    }
+  }
 
-        plot(tab_SMM$time_neg, tab_SMM$traj_SMM,  las=1,
-             lwd  = 4, type = "l",
-             xlab = x.lab,  ylab = y.lab,
-             main = main.traj.marg,
-             col  = "cyan4",
-             legend = NULL)
-      }
+
+
+  ################################
+  # CONTINUOUS GROUPING VARIABLE #
+  ################################
+  if (is.null(traj.marg.group)==F & is.numeric(dataset[,traj.marg.group]) == TRUE){
+
+    bound = round(quantile(dataset[,traj.marg.group], probs = percentiles),1)
+    pos_raw = which(traj.marg.group == rownames(mat_predictor))
+
+    ## GROUP OF REFENCE (val in the 10th percentile)
+    A_group0 = coef.SMM[1]+
+      coef.SMM[1+pos_raw]*mat_predictor[pos_raw,1]*bound[1]
+    B_group0 = coef.SMM[1*length(var.all2)+length(var.last.level2) + 2]+
+      coef.SMM[1*length(var.all2)+length(var.last.level2) + 2 + pos_raw]*mat_predictor[pos_raw,2]*bound[1]
+    C_group0 = coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3]+
+      coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3 + pos_raw]*mat_predictor[pos_raw,3]*bound[1]
+
+    if (is.na(coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw])==F){
+
+      D_group0 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]+
+        coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw]*mat_predictor[pos_raw,4]*bound[1]
+
+    } else if (is.na(coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw])==T){
+
+      D_group0 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]
+
     }
 
+    ## SECOND GROUP (val in the 90th percentile)
+    A_group1 = coef.SMM[1]+
+      coef.SMM[1+pos_raw]*mat_predictor[pos_raw,1]*bound[2]
+    B_group1 = coef.SMM[1*length(var.all2)+length(var.last.level2) + 2]+
+      coef.SMM[1*length(var.all2)+length(var.last.level2) + 2 + pos_raw]*mat_predictor[pos_raw,2]*bound[2]
+    C_group1 = coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3]+
+      coef.SMM[2*length(var.all2)+length(var.last.level2)+length(var.first.level2) + 3 + pos_raw]*mat_predictor[pos_raw,3]*bound[2]
 
+    if (is.na(coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw])==F){
 
-    ######################################################
-    ### ESTIMATED MARGINAL TRAJECTORIES BETWEEN GROUPS ###
-    ######################################################
-    ################################
-    #   BINARY GROUPING VARIABLE   #
-    ################################
-    if (is.null(traj.marg.group)==F & is.factor(dataset[,traj.marg.group]) == TRUE){
+      D_group1 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]+
+        coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw]*mat_predictor[pos_raw,4]*bound[2]
 
-      ## GROUP OF REFENCE (val == 0)
-      A_group0 = coef.SMM[1]
-      B_group0 = coef.SMM[1*length(var.all)+length(var.last.level) + 2]
-      C_group0 = coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3]
-      D_group0 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]
-      ## SECOND GROUP (val == 1)
-      pos_raw = which(traj.marg.group == rownames(mat_predictor))
+    } else if (is.na(coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4 + pos_raw])==T){
 
-      A_group1 = coef.SMM[1]+
-        coef.SMM[1+pos_raw]*mat_predictor[pos_raw,1]
-      B_group1 = coef.SMM[1*length(var.all)+length(var.last.level) + 2]+
-        coef.SMM[1*length(var.all)+length(var.last.level) + 2 + pos_raw]*mat_predictor[pos_raw,2]
-      C_group1 = coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3]+
-        coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3 + pos_raw]*mat_predictor[pos_raw,3]
+      D_group1 = coef.SMM[3*length(var.all2)+length(var.last.level2)+length(var.first.level2)+length(var.midpoint2) + 4]
 
-      if (is.na(coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw])==F){
-
-        D_group1 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]+
-          coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw]*mat_predictor[pos_raw,4]
-
-      } else if (is.na(coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw])==T){
-
-        D_group1 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]
-
-      }
-
-      # POSITIVE TIMESCALE #
-      if (mean(dataset[,time]) > 0){
-        min_x = round(quantile(dataset[,time], probs=c(0.01)),0)
-        max_x = round(quantile(dataset[,time], probs=c(0.90)),0)
-        tab_SMM  = data.frame(time_pos = seq(min_x, max_x,0.1))
-        tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
-        tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
-        ##
-        min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        ##
-        plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
-             lwd  = 5, type = "l",
-             xlab = x.lab,  ylab = y.lab,
-             ylim = c(min_y, max_y),
-             main = main.traj.marg.group,
-             col  = "cyan4",
-             legend = NULL)
-        points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
-               lty=3, lwd = 3, type = "l")
-        # legend
-        group0 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[1], collapse = ""))
-        group1 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[2], collapse = ""))
-        legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
-               col=c("cyan4","red"), legend = c(group0,group1))
-
-        # NEGATIVE TIMESCALE #
-      } else if (mean(dataset[,time]) < 0) {
-
-        min_x = round(quantile(dataset[,time], probs=c(0.1)),0)
-        max_x = round(quantile(dataset[,time], probs=c(0.99)),0)
-        tab_SMM  = data.frame(time_neg = seq(min_x, max_x,0.1), time_pos = seq(-min_x, max_x,-0.1))
-        tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
-        tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
-        ##
-        min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        ##
-        plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
-             lwd  = 5, type = "l",
-             xlab = x.lab,  ylab = y.lab,
-             ylim = c(min_y, max_y),
-             main = main.traj.marg.group,
-             col  = "cyan4",
-             legend = NULL)
-        points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
-               lty=3, lwd = 3, type = "l")
-        # legend
-        group0 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[1], collapse = ""))
-        group1 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[2], collapse = ""))
-        legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
-               col=c("cyan4","red"), legend = c(group0,group1))
-      }
     }
 
+    # POSITIVE TIMESCALE #
+    if (mean(dataset[,time]) > 0){
+      min_x = round(quantile(dataset[,time], probs=c(0.01)),0)
+      max_x = round(quantile(dataset[,time], probs=c(0.90)),0)
+      tab_SMM  = data.frame(time_pos = seq(min_x, max_x,0.1))
+      tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
+      tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
+      ##
+      min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      ##
+      plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
+           lwd  = 5, type = "l",
+           xlab = x.lab,  ylab = y.lab,
+           ylim = c(min_y, max_y),
+           main = main.traj.marg.group,
+           col  = "cyan4",
+           legend = NULL)
+      points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
+             lty=3, lwd = 3, type = "l")
+      # legend
+      group0 = as.character(paste0(traj.marg.group," (",percentiles[1]*100,"th percentile)", collapse =""))
+      group1 = as.character(paste0(traj.marg.group," (",percentiles[2]*100,"th percentile)", collapse =""))
+      legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
+             col=c("cyan4","red"), legend = c(group0,group1), cex=0.9)
 
+      # NEGATIVE TIMESCALE #
+    } else if (mean(dataset[,time]) < 0) {
 
-    ################################
-    # CONTINUOUS GROUPING VARIABLE #
-    ################################
-    if (is.null(traj.marg.group)==F & is.numeric(dataset[,traj.marg.group]) == TRUE){
-
-      bound = round(quantile(dataset[,traj.marg.group], probs = percentiles),1)
-      pos_raw = which(traj.marg.group == rownames(mat_predictor))
-
-      ## GROUP OF REFENCE (val in the 10th percentile)
-      A_group0 = coef.SMM[1]+
-        coef.SMM[1+pos_raw]*mat_predictor[pos_raw,1]*bound[1]
-      B_group0 = coef.SMM[1*length(var.all)+length(var.last.level) + 2]+
-        coef.SMM[1*length(var.all)+length(var.last.level) + 2 + pos_raw]*mat_predictor[pos_raw,2]*bound[1]
-      C_group0 = coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3]+
-        coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3 + pos_raw]*mat_predictor[pos_raw,3]*bound[1]
-
-      if (is.na(coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw])==F){
-
-        D_group0 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]+
-          coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw]*mat_predictor[pos_raw,4]*bound[1]
-
-      } else if (is.na(coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw])==T){
-
-        D_group0 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]
-
-      }
-
-      ## SECOND GROUP (val in the 90th percentile)
-      A_group1 = coef.SMM[1]+
-        coef.SMM[1+pos_raw]*mat_predictor[pos_raw,1]*bound[2]
-      B_group1 = coef.SMM[1*length(var.all)+length(var.last.level) + 2]+
-        coef.SMM[1*length(var.all)+length(var.last.level) + 2 + pos_raw]*mat_predictor[pos_raw,2]*bound[2]
-      C_group1 = coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3]+
-        coef.SMM[2*length(var.all)+length(var.last.level)+length(var.first.level) + 3 + pos_raw]*mat_predictor[pos_raw,3]*bound[2]
-
-      if (is.na(coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw])==F){
-
-        D_group1 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]+
-          coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw]*mat_predictor[pos_raw,4]*bound[2]
-
-      } else if (is.na(coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4 + pos_raw])==T){
-
-        D_group1 = coef.SMM[3*length(var.all)+length(var.last.level)+length(var.first.level)+length(var.midpoint) + 4]
-
-      }
-
-      # POSITIVE TIMESCALE #
-      if (mean(dataset[,time]) > 0){
-        min_x = round(quantile(dataset[,time], probs=c(0.01)),0)
-        max_x = round(quantile(dataset[,time], probs=c(0.90)),0)
-        tab_SMM  = data.frame(time_pos = seq(min_x, max_x,0.1))
-        tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
-        tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
-        ##
-        min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        ##
-        plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
-             lwd  = 5, type = "l",
-             xlab = x.lab,  ylab = y.lab,
-             ylim = c(min_y, max_y),
-             main = main.traj.marg.group,
-             col  = "cyan4",
-             legend = NULL)
-        points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
-               lty=3, lwd = 3, type = "l")
-        # legend
-        group0 = as.character(paste0(traj.marg.group," (",percentiles[1]*100,"th percentile)", collapse =""))
-        group1 = as.character(paste0(traj.marg.group," (",percentiles[2]*100,"th percentile)", collapse =""))
-        legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
-               col=c("cyan4","red"), legend = c(group0,group1), cex=0.9)
-
-        # NEGATIVE TIMESCALE #
-      } else if (mean(dataset[,time]) < 0) {
-
-        min_x = round(quantile(dataset[,time], probs=c(0.1)),0)
-        max_x = round(quantile(dataset[,time], probs=c(0.99)),0)
-        tab_SMM  = data.frame(time_neg = seq(min_x, max_x,0.1), time_pos = seq(-min_x, max_x,-0.1))
-        tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
-        tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
-        ##
-        min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
-        ##
-        plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
-             lwd  = 5, type = "l",
-             xlab = x.lab,  ylab = y.lab,
-             ylim = c(min_y, max_y),
-             main = main.traj.marg.group,
-             col  = "cyan4",
-             legend = NULL)
-        points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
-               lty=3, lwd = 3, type = "l")
-        # legend
-        group0 = as.character(paste0(traj.marg.group," (",percentiles[1]*100,"th percentile)", collapse =""))
-        group1 = as.character(paste0(traj.marg.group," (",percentiles[2]*100,"th percentile)", collapse =""))
-        legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
-               col=c("cyan4","red"), legend = c(group0,group1), cex=0.9)
-      }
+      min_x = round(quantile(dataset[,time], probs=c(0.1)),0)
+      max_x = round(quantile(dataset[,time], probs=c(0.99)),0)
+      tab_SMM  = data.frame(time_neg = seq(min_x, max_x,0.1), time_pos = seq(-min_x, max_x,-0.1))
+      tab_SMM$traj_SMM_group0 = SSlogis5(tab_SMM$time_pos, A_group0, B_group0, C_group0, D_group0, theta=1)
+      tab_SMM$traj_SMM_group1 = SSlogis5(tab_SMM$time_pos, A_group1, B_group1, C_group1, D_group1, theta=1)
+      ##
+      min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
+      ##
+      plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
+           lwd  = 5, type = "l",
+           xlab = x.lab,  ylab = y.lab,
+           ylim = c(min_y, max_y),
+           main = main.traj.marg.group,
+           col  = "cyan4",
+           legend = NULL)
+      points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
+             lty=3, lwd = 3, type = "l")
+      # legend
+      group0 = as.character(paste0(traj.marg.group," (",percentiles[1]*100,"th percentile)", collapse =""))
+      group1 = as.character(paste0(traj.marg.group," (",percentiles[2]*100,"th percentile)", collapse =""))
+      legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
+             col=c("cyan4","red"), legend = c(group0,group1), cex=0.9)
     }
+  }
 
-    # output
-    print(list(model.fit, tab))
-    cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
-    return(list(model.fit, tab))
+  # output
+  print(list(model.fit, tab))
+  cat("----------------------------------------------------\n The program took", round(cost[3],2), "seconds \n")
+  return(model.fit)
 
 
 }

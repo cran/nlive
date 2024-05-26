@@ -465,7 +465,6 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       n1 = tab_traj$slope1[1]
       n2 = tab_traj$slope2[1]
       n3 = tab_traj$changepoint[1]
-      c(n0,n1,n2,n3)
 
       tab_traj$I1       = as.numeric(tab_traj$time <= tab_traj$changepoint)
       tab_traj$I2       = as.numeric(tab_traj$time >  tab_traj$changepoint)
@@ -514,10 +513,15 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       n2_group0 = tab_traj$slope2[1]
       n3_group0 = tab_traj$changepoint[1]
 
+      ## GROUP OF REFENCE (val == 0) ##
+      tab_traj$I1       = as.numeric(tab_traj$time <= tab_traj$changepoint)
+      tab_traj$I2       = as.numeric(tab_traj$time >  tab_traj$changepoint)
+      tab_traj$traj_PMM_group0 = tab_traj$I1*(n0_group0 + n2_group0*n3_group0 + n1_group0*(tab_traj$time - n3_group0)) +
+        tab_traj$I2*(n0_group0 + n2_group0*tab_traj$time)
+
+
       ## GROUP OF REFENCE (val == 1)
       pos_raw = which(traj.marg.group == rownames(mat_predictor))
-      ##
-      tab_traj = data.frame(time = seq(min_plot, max_plot, 0.1), transition = 2)
       ##
       tab_traj$last.level  = coef.PMM[1] + coef.PMM[1+pos_raw]*mat_predictor[pos_raw,1]
       tab_traj$slope1      = coef.PMM[1*length(var.all2)+length(var.last.level2) + 2] + coef.PMM[1*length(var.all2)+length(var.last.level2) + 2 + pos_raw]*mat_predictor[pos_raw,2]
@@ -539,16 +543,11 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       n2_group1 = tab_traj$slope2[1]
       n3_group1 = tab_traj$changepoint[1]
 
-
-      ## GROUP OF REFENCE (val == 0) ##
+      ## SECOND GROUP (val == 1) ##
       tab_traj$I1       = as.numeric(tab_traj$time <= tab_traj$changepoint)
       tab_traj$I2       = as.numeric(tab_traj$time >  tab_traj$changepoint)
-      tab_traj$traj_PMM_group0 = tab_traj$I1*(n0_group0 + n2_group0*n3_group0 + n1_group0*(tab_traj$time - n3_group0)) +
-        tab_traj$I2*(n0_group0 + n2_group0*tab_traj$time)
-      ## SECOND GROUP (val == 1) ##
       tab_traj$traj_PMM_group1 = tab_traj$I1*(n0_group1 + n2_group1*n3_group1 + n1_group1*(tab_traj$time - n3_group1)) +
         tab_traj$I2*(n0_group1 + n2_group1*tab_traj$time)
-
 
       ##
       min_y = min(tab_traj$traj_PMM_group0, tab_traj$traj_PMM_group1)
@@ -588,7 +587,6 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
         min_plot = round(quantile(dataset[,time], probs=c(0.1)),0)
         max_plot = round(quantile(dataset[,time], probs=c(0.99)),0)
       }
-      c(min_plot,max_plot)
 
       ## GROUP OF REFERENCE (val in the 10th percentile)
       tab_traj_group0 = data.frame(time = seq(min_plot, max_plot, 0.1), transition = 2)
@@ -622,7 +620,7 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
 
 
       ## SECOND GROUP (val in the 90th percentile)
-      tab_traj_group1 = data.frame(time = seq(min_plot, max_plot, 0.1), transition = 2)
+       tab_traj_group1 = data.frame(time = seq(min_plot, max_plot, 0.1), transition = 2)
       ##
       tab_traj_group1$last.level  = coef.PMM[1] + coef.PMM[1+pos_raw]*mat_predictor[pos_raw,1]*bound[2]
       tab_traj_group1$slope1      = coef.PMM[1*length(var.all2)+length(var.last.level2) + 2] + coef.PMM[1*length(var.all2)+length(var.last.level2) + 2 + pos_raw]*mat_predictor[pos_raw,2]*bound[2]
@@ -643,7 +641,6 @@ nlive.pmma <- function(dataset, ID, outcome, time, var.all = NULL,
       n1_group1 = tab_traj_group1$slope1[1]
       n2_group1 = tab_traj_group1$slope2[1]
       n3_group1 = tab_traj_group1$changepoint[1]
-
 
 
       ## SECOND GROUP (val == 1) ##

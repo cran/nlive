@@ -151,7 +151,6 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
   dataset$outcome = na.omit(dataset[,outcome])
   dataset$time    = na.omit(dataset[,time])
 
-
   ##########################################
   ## accounting for categorical variables ##
   ##########################################
@@ -266,7 +265,7 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
     tab_int = subset(dataset, time >= frag[4])
     lmm  = hlme(outcome ~ 1 + time, random = ~1 + time, subject=ID, data=tab_int, verbose = F)
     slope5 = mean(coef(lmm)["time"])
-    ###
+    ##
     y = c(slope1,slope2,slope3,slope4,slope5)
     val = min(y)
     pos = frag[which(y == val)-1]
@@ -278,14 +277,25 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
     tempo   = subset(dataset, time < quantile(dataset$time, probs=c(0.05)))
     first.level  = mean(tempo[, outcome])
     ##
-    tempo = subset(dataset, time_pos < -pos)
+    if (mean(dataset[,time]) > 0){
+    tempo = subset(dataset, time_pos < pos)
     lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
     low   = as.numeric(coef(lmm)["time_pos"])
     ##
-    tempo = subset(dataset, time_pos > -pos)
+    tempo = subset(dataset, time_pos > pos)
     lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
     high  = as.numeric(coef(lmm)["time_pos"])
     c(low,high)
+    } else if (mean(dataset[,time]) < 0){
+      tempo = subset(dataset, time_pos < -pos)
+      lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
+      low   = as.numeric(coef(lmm)["time_pos"])
+      ##
+      tempo = subset(dataset, time_pos > -pos)
+      lmm   = hlme(outcome ~ 1+time_pos, random =~1+time_pos, subject=ID, data=tempo, verbose = F)
+      high  = as.numeric(coef(lmm)["time_pos"])
+      c(low,high)
+    }
     ##
     midpoint   = ifelse(abs(low/high)> 0.5 & abs(low/high) < 1.5, 300, 2)
     hill.slope = ifelse(abs(low/high)> 0.5 & abs(low/high) < 1.5, 1.05, 0.5)
@@ -479,8 +489,6 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
     }
   }
 
-
-
   ######################################################
   ### ESTIMATED MARGINAL TRAJECTORIES BETWEEN GROUPS ###
   ######################################################
@@ -527,19 +535,19 @@ nlive.smm <- function(dataset, ID, outcome, time, var.all = NULL,
       min_y = min(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
       max_y = max(tab_SMM$traj_SMM_group0, tab_SMM$traj_SMM_group1)
       ##
-      plot(tab_SMM$time_neg, tab_SMM$traj_SMM_group0,  las=1,
+      plot(tab_SMM$time_pos, tab_SMM$traj_SMM_group0,  las=1,
            lwd  = 5, type = "l",
            xlab = x.lab,  ylab = y.lab,
            ylim = c(min_y, max_y),
            main = main.traj.marg.group,
            col  = "cyan4",
            legend = NULL)
-      points(tab_SMM$time_neg, tab_SMM$traj_SMM_group1, col="red",
+      points(tab_SMM$time_pos, tab_SMM$traj_SMM_group1, col="red",
              lty=3, lwd = 3, type = "l")
       # legend
       group0 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[1], collapse = ""))
       group1 = as.character(paste(traj.marg.group,"=",unique(dataset[,traj.marg.group])[2], collapse = ""))
-      legend("bottomleft", bty = "n", lwd=3, lty = c(1,3),
+      legend("bottomright", bty = "n", lwd=3, lty = c(1,3),
              col=c("cyan4","red"), legend = c(group0,group1))
 
       # NEGATIVE TIMESCALE #

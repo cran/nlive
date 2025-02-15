@@ -30,4 +30,7 @@ utils::globalVariables(c("%>%",
                          'write.table',
                          'read.table',
                          'dummy_cols',
-                         "which"))
+                         "which",
+                         "pmax",
+                         "quantile",
+                         "as.formula"))

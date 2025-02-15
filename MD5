@@ -1,13 +1,14 @@
-4aaa87993bb111411a8e5b48dcf3e4d5 *DESCRIPTION
+10de5932d4c84fa75597a7095d44ce5f *DESCRIPTION
 9cab8a14b65a32020c77530e3a8c058b *LICENSE
-788ac00c6af23f92674d396f531a5a8b *NAMESPACE
+21ecf27d7b6989ba0c90454423f6d46b *NAMESPACE
 8403cad37870421ff51a650aa56ce47a *R/dataCog.R
-191e7a4336ac47b85348a5e8fba7ee24 *R/globals.R
+f0c0844c4b702242b48a67c844019d8d *R/globals.R
 7b43f7ccae5c387f8ed863b3da374867 *R/nlive.R
 4da14ef000e83f1dd3b913874c588aa1 *R/nlive.inspect.R
 a5e3512ca4588927516ef581136938a1 *R/nlive.pmma.R
 5f357253c592430ca7fcf2b46cb74ffc *R/nlive.pmms.R
 0a317f57aa8ef624bf25ec47e9d490f1 *R/nlive.smm.R
+e171a209585f2869dc12bbb8aba3f97d *R/nlive.splines.R
 3d0ea36def8fd9c756c8fe3e10ed8aa6 *data/dataCog.rda
 41b06d49da3c10681a19884ae09f48d6 *man/dataCog.Rd
 52ff4b11e661410b76aa24a2365d9784 *man/nlive.Rd
@@ -15,3 +16,4 @@ ed61b5107b6d7561e553d47daa5d3ed1 *man/nlive.inspect.Rd
 efb469afa9aeb83948cd3e8cb1226086 *man/nlive.pmma.Rd
 7d5fc9ef972d40eff579aa7ddd6c8ad4 *man/nlive.pmms.Rd
 26e8dc3715c4c436dc2ca93df75b8777 *man/nlive.smm.Rd
+0f89ace5d9c67e3bffdd1bd9acf54bfc *man/nlive.splines.Rd
